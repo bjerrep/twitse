@@ -1,6 +1,6 @@
 
 
-# wifitimesync
+# twitse
 
 ## What is this
 This is an experimental playground for getting a wireless raspberry pi client and a wired raspberry pi server in 'pretty good' time sync. 

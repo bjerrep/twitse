@@ -26,5 +26,3 @@ target_link_libraries(
     Qt5::Network
     pthread
     )
-
-MESSAGE( STATUS "CMAKE_CXX_FLAGS: " ${CMAKE_CXX_FLAGS} )

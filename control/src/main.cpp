@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
     uint16_t port = g_multicastPort;
 
     QCommandLineParser parser;
-    parser.setApplicationDescription("wifitimesync control");
+    parser.setApplicationDescription("twitse control");
     parser.addHelpOption();
     parser.addOptions({
         {"dumpraw", "let client(s) dump all offset measurements to files"},

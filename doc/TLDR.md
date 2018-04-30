@@ -1,6 +1,6 @@
 
 
-# wifitimesync
+# twitse
 
 ## TLDR
 The reason behind this project was to develop a timing framework for playing audio on multiple wireless raspberry pi clients, where e.g. two clients could be playing either right or left channel of a stereo signal. The accuracy actually required for such an audio setup is not part of the project here, for now its just about getting a feel for the obtainable timing accuracy in a minimal wireless setup.
@@ -52,8 +52,11 @@ Experiment with a -j# switch. (4 concurrent compilations might be too much)
 A full build produces 4 binaries, server, client, control and dataanalysis.
 
 **server** : the server running on a wired pi. It can be started as is. Both server, client and control uses a common multicast socket so e.g. clients will automatically connect to a running server.
+
 **client** : the client running on a wireless pi. It requires a --id switch with a unique name.
+
 **control** : can reconfigure or query a running server or client via the common multicast socket.
+
 **dataanalysis** : can be used to process raw sample dump files in order to play with the filtering algorithms on canned data. Always a little dated and broken.
 
 Both server and client raspberry pi needs to get overclocked and run continuesly at full tilt. See RPI.md in doc. Just for the record then the server currently run Arch64 and the client Arch32 for no particular reason.
