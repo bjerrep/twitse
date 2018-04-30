@@ -27,6 +27,7 @@ static const int TIMEROFF = -1;
 enum DevelopmentMask
 {
     None                        = 0x00,
+    SameHost                    = 0x01,
     OnBailingOut                = 0x02,
     AnalysisAppendToSummary     = 0x04,
     SaveMeasurements            = 0x08,

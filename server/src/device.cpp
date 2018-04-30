@@ -108,7 +108,7 @@ void Device::processMeasurement(const RxPacket& rx)
 
     bool valid = true;
 
-    if (roundtrip_ms < 1.0 or roundtrip_ms > 5.0)
+    if (!(g_developmentMask & DevelopmentMask::SameHost) and (roundtrip_ms < 1.0 or roundtrip_ms > 5.0))
     {
         trace->critical("either system times are invalid or network is useless, roundtrip is {:.3f} msecs. Aborting", roundtrip_ms);
         valid = false;

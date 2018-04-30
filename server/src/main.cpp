@@ -38,10 +38,11 @@ int main(int argc, char *argv[])
     QCommandLineParser parser;
     parser.setApplicationDescription("hardsync server");
     parser.addHelpOption();
-    parser.addOptions(
-    {{"port", "multicast port", "port"},
-     {"loglevel", "0:error 1:info(default) 2:debug 3:all", "loglevel"}
-                });
+    parser.addOptions({
+          {"port", "multicast port", "port"},
+          {"loglevel", "0:error 1:info(default) 2:debug 3:all", "loglevel"},
+          {"samehost", "both server and client runs on the same host, accept unexpected measurements"}
+      });
     parser.process(app);
 
     uint16_t port = parser.value("port").toUInt();
@@ -63,6 +64,11 @@ int main(int argc, char *argv[])
     }
     spdlog::set_level(loglevel);
 
+    if (parser.isSet("samehost"))
+    {
+        g_developmentMask = (DevelopmentMask) (g_developmentMask | DevelopmentMask::SameHost);
+    }
+
     trace->info(IMPORTANT "server starting at {} with multicast at {}:{}" RESET,
                 Interface::getLocalAddress().toString().toStdString(),
                 address.toString().toStdString(),
@@ -75,7 +81,6 @@ int main(int argc, char *argv[])
         trace->critical("unable to set realtime priority");
     }
 
-    Server server(&app, QString("server"), address, port);
+    Server server(&app, "server", address, port);
     return app.exec();
-    trace->info("server exits");
 }
