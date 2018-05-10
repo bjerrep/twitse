@@ -1,0 +1,30 @@
+language: cpp
+
+compiler:
+  - gcc
+
+before_install:
+  - sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 1397BC53640DB551
+  - sudo apt-add-repository --yes ppa:ubuntu-toolchain-r/test
+  - sudo apt-add-repository --yes ppa:beineri/opt-qt591-trusty
+  - sudo apt-get update -qq
+ 
+install:
+  - sudo apt-get install -qq g++-6
+  - sudo apt-get --yes install qt59-meta-minimal
+  - if [ "$CXX" = "g++" ]; then export CXX="g++-6" CC="gcc-6"; fi
+
+before_script:
+  - QT_ENV_SCRIPT=$(find /opt -name 'qt*-env.sh')
+  - source $QT_ENV_SCRIPT
+  - mkdir external
+  - cd external
+  - git submodule add https://github.com/gabime/spdlog.git
+  - git submodule update --init
+  - cd ..
+  - mkdir build
+  - cd build
+  - cmake ..
+
+script:
+  - make

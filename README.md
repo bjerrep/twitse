@@ -1,4 +1,4 @@
-
+[![Build Status](https://travis-ci.org/bjerrep/twitse.svg?branch=master)](https://travis-ci.org/bjerrep/twitse)
 
 # twitse
 
