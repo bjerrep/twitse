@@ -5,6 +5,13 @@ project(server)
 find_package(Qt5Core)
 find_package(Qt5Network)
 
+option(VCTCXO "DAC and voltage controlled processor crystal" OFF)
+
+if (VCTCXO)
+    message(STATUS "server DAC/VCTCXO enabled")
+    add_definitions(-DVCTCXO)
+endif()
+
 file(GLOB_RECURSE sources src/*)
 
 include_directories(

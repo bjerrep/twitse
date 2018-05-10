@@ -17,7 +17,8 @@ Control::Control(QCoreApplication *parent, QCommandLineParser& parser, const QHo
 
     m_multicast = new Multicast("no1", address, port);
 
-    int success = 0;
+    QString client_name = parser.value("client");
+
     if (parser.isSet("samples"))
     {
         MulticastTxPacket tx(KeyVal{
@@ -27,7 +28,6 @@ Control::Control(QCoreApplication *parent, QCommandLineParser& parser, const QHo
             {"action", "samples"},
             {"value", parser.value("samples")}});
         m_multicast->tx(tx);
-        success++;
     }
     if (parser.isSet("silence"))
     {
@@ -38,7 +38,6 @@ Control::Control(QCoreApplication *parent, QCommandLineParser& parser, const QHo
             {"action", "silence"},
             {"value", parser.value("silence")}});
         m_multicast->tx(tx);
-        success++;
     }
     if (parser.isSet("kill"))
     {
@@ -48,23 +47,30 @@ Control::Control(QCoreApplication *parent, QCommandLineParser& parser, const QHo
             {"to", parser.value("kill")},
             {"action", "kill"}});
         m_multicast->tx(tx);
-        success++;
     }
-
-    if (!success)
+    if (parser.isSet("vctcxodac"))
     {
-        trace->error("nothing to do? try --help");
+        if (client_name.isEmpty())
+        {
+            trace->critical("need a client name ?");
+            exit(1);
+        }
+        MulticastTxPacket tx(KeyVal{
+            {"from", "control"},
+            {"command", "control"},
+            {"to", client_name},
+            {"action", "vctcxodac"},
+            {"value", parser.value("vctcxodac")}});
+        m_multicast->tx(tx);
     }
 
     if (parser.isSet("dumpraw"))
     {
         development_mask = (DevelopmentMask) (development_mask | DevelopmentMask::SaveMeasurements);
-        success++;
     }
     if (parser.isSet("clientsummaries"))
     {
         development_mask = (DevelopmentMask) (development_mask | DevelopmentMask::SaveClientSummaryLines);
-        success++;
     }
     if (development_mask != DevelopmentMask::None)
     {

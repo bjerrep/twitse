@@ -4,6 +4,9 @@
 #include "systemtime.h"
 #include "interface.h"
 #include "apputils.h"
+#ifdef VCTCXO
+#include "i2c_access.h"
+#endif
 
 #include <QObject>
 #include <QThread>
@@ -16,7 +19,7 @@ extern DevelopmentMask g_developmentMask;
 
 Client::Client(QCoreApplication *parent, QString name,
                const QHostAddress &address, uint16_t port,
-               spdlog::level::level_enum loglevel, bool no_clock_adj, bool useFixedPPM, double fixedPPM)
+               spdlog::level::level_enum loglevel, bool no_clock_adj, bool autoPPM_LSB, double fixedPPM_LSB)
     : m_parent(parent),
       m_name(name),
       m_logLevel(loglevel),
@@ -28,11 +31,12 @@ Client::Client(QCoreApplication *parent, QString name,
 
     reset();
 
-    if (useFixedPPM)
+    if (!autoPPM_LSB)
     {
-        SystemTime::setPPM(fixedPPM);
-        m_noPPMAdj = true;
-        trace->info("setting fixed ppm to {}", fixedPPM);
+        SystemTime::setPPM(fixedPPM_LSB);
+        m_dacLSB = fixedPPM_LSB;
+        m_autoPPM_LSB_Adjust = false;
+        trace->info("setting fixed ppm/lsb to to {}", fixedPPM_LSB);
     }
 
     m_multicastThread = new QThread(parent);
@@ -49,12 +53,22 @@ Client::Client(QCoreApplication *parent, QString name,
     sendServerConnectRequest();
 
     m_SystemTimeRefreshTimer = startTimer(20);
+
+#ifdef VCTCXO
+    m_i2c = new I2C_Access(1);
+    m_i2c->writeLTC2606(m_dacLSB);
+    double luhab_temperature = m_i2c->readTemperature();
+    trace->info("luhab carrier board temperature is {:.1f} °C", luhab_temperature);
+#endif
 }
 
 
 Client::~Client()
 {
     delete m_measurementSeries;
+#ifdef VCTCXO
+    delete m_i2c;
+#endif
 }
 
 
@@ -145,10 +159,11 @@ void Client::multicastRx(MulticastRxPacketPtr rx)
     else if (m_connectionState == ConnectionState::CONNECTED)
     {
         m_serverAlive = true;
-        if (rx->value("command") == "control")
-        {
-            executeControl(rx);
-        }
+    }
+
+    if (rx->value("command") == "control")
+    {
+        executeControl(rx);
     }
 }
 
@@ -166,6 +181,26 @@ void Client::executeControl(MulticastRxPacketPtr rx)
     else if (action == "developmentmask")
     {
         g_developmentMask = (DevelopmentMask) rx->value("developmentmask").toInt();
+    }
+    else if (action == "vctcxodac")
+    {
+#ifdef VCTCXO
+        QString value = rx->value("value");
+        if (value == "auto")
+        {
+            trace->info("setting vctcxo to auto");
+            m_autoPPM_LSB_Adjust = true;
+        }
+        else
+        {
+            uint16_t dac = value.toUShort();
+            m_i2c->writeLTC2606(dac);
+            trace->info("setting vctcxo to fixed value {} (0x{:04x})", dac, dac);
+            m_autoPPM_LSB_Adjust = false;
+        }
+#else
+        trace->error("running in standalone mode, there is no dac here");
+#endif
     }
     else
     {
@@ -282,20 +317,21 @@ void Client::tcpRx()
                 double local_ppm = m_offsetMeasurementHistory.getPPM();
                 //double server_ppm = rx.value("set_ppm").toDouble();
 
-                if (m_setInitialLocalPPM and !m_noPPMAdj)
+                if (m_setInitialLocalPPM and m_autoPPM_LSB_Adjust)
                 {
-                    SystemTime::setPPM(local_ppm);
+                    adjustPPM(local_ppm);
                     m_setInitialLocalPPM = false;
                 }
             }
+            m_offsetMeasurementHistory.reset();
             m_offsetMeasurementHistory.enableAverages();
         }
         else if (command == "adjustppm")
         {
-            if (!m_noPPMAdj)
+            if (m_autoPPM_LSB_Adjust)
             {
                 double ppm = rx.value("ppm_adjust").toDouble();
-                SystemTime::setPPM(ppm);
+                adjustPPM(ppm);
             }
         }
         else
@@ -323,6 +359,42 @@ void Client::tcpTx(const std::string& command)
     QJsonObject json;
     json["command"] = QString::fromStdString(command);
     tcpTx(json);
+}
+
+
+void Client::adjustPPM(double ppm)
+{
+#ifndef VCTCXO
+    SystemTime::setPPM(ppm);
+    return;
+#else
+    if (!m_autoPPM_LSB_Adjust)
+    {
+        return;
+    }
+    const double lsb_per_ppm = 4000.0;
+
+    int64_t dacLSBcopy = m_dacLSB;
+
+    m_dacLSB -= ppm * lsb_per_ppm;
+
+    if (m_dacLSB < 0)
+    {
+        m_dacLSB = 0;
+    }
+    else if (m_dacLSB > 0xFFFF)
+    {
+        m_dacLSB = 0xFFFF;
+    }
+    if (m_dacLSB == 0 || m_dacLSB == 0xFFFF)
+    {
+        trace->critical("dac is saturated");
+    }
+
+    m_i2c->writeLTC2606(m_dacLSB);
+    SystemTime::setPPM(m_dacLSB);
+    trace->info("ppm adjusted {} from {} to {} lsb", m_dacLSB - dacLSBcopy, dacLSBcopy, m_dacLSB);
+#endif
 }
 
 

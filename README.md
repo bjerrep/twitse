@@ -9,5 +9,5 @@ The following graph shows an hour of measurements on a plain 2.4GHz wifi. It is 
 
 <p align="center"><img src="dataanalysis/data/1hour_throttle_off/server/plot.png"></p>
 
-There are some more words [here](doc/TLDR.md).
+There are some more words [here](doc/TLDR.md) (standalone) and [here](doc/VCTCXO.md) (VCTCXO).
 

@@ -7,7 +7,8 @@
 
 
 OffsetMeasurementHistory::OffsetMeasurementHistory(double maxSeconds, int minMeasurements)
-    : m_maxSeconds(maxSeconds), m_minMeasurements(minMeasurements)
+    : m_maxSeconds(maxSeconds),
+      m_minMeasurements(minMeasurements)
 {
 }
 
@@ -174,6 +175,15 @@ std::string OffsetMeasurementHistory::toString() const
     double offset_us = last_measurement.m_offset_ns / 1000.0;
     double package_loss = 100.0 * last_measurement.m_usedSamples / last_measurement.m_collectedSamples;
 
+#ifdef VCTCXO
+    return fmt::format("{:-3d} runtime {:5.1f} samples/used {}/{:4.1f}% secs/size {:5.1f}/{} offset_us {:-5.1f} avgoff_us {:-5.1f}"
+                       " ppm {:-7.3f} avgppm {:-7.3f} sd_us {:-5.1f} vctcxo {:0f}",
+                       m_loop, SystemTime::getRunningTime_secs(), m_totalMeasurements, package_loss,
+                       getTimeSpan_sec(), m_offsetMeasurements.size(),
+                       offset_us, m_movingAverageOffset_ns/1000.0,
+                       getPPM(), m_averageSlope * 1000000.0, m_sd_ns/1000.0,
+                       SystemTime::getPPM());
+#else
     return fmt::format("{:-3d} runtime {:5.1f} samples/used {}/{:4.1f}% secs/size {:5.1f}/{} offset_us {:-5.1f} avgoff_us {:-5.1f}"
                        " ppm {:-7.3f} avgppm {:-7.3f} sd_us {:-5.1f} systimeppm {:-7.3f}",
                        m_loop, SystemTime::getRunningTime_secs(), m_totalMeasurements, package_loss,
@@ -181,4 +191,5 @@ std::string OffsetMeasurementHistory::toString() const
                        offset_us, m_movingAverageOffset_ns/1000.0,
                        getPPM(), m_averageSlope * 1000000.0, m_sd_ns/1000.0,
                        SystemTime::getPPM());
+#endif
 }

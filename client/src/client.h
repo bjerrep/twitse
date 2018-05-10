@@ -9,6 +9,8 @@
 #include <QTcpSocket>
 #include <QUdpSocket>
 
+class I2C_Access;
+
 class Client : public QObject
 {
     Q_OBJECT
@@ -25,7 +27,7 @@ public:
     Client(QCoreApplication *parent, QString name,
            const QHostAddress &address, uint16_t port,
            spdlog::level::level_enum loglevel,
-           bool clockadj, bool useFixedPPM, double fixedPPM);
+           bool clockadj, bool autoPPM_LSB, double fixedPPM_LSB);
 
     ~Client();
 
@@ -39,6 +41,7 @@ private:
     void multicastTx(MulticastTxPacket tx);
     void tcpTx(const QJsonObject& json);
     void tcpTx(const std::string& command);
+    void adjustPPM(double ppm);
 
     void reconnectTimer(bool on);
     void sendLocalTimeUDP();
@@ -58,7 +61,7 @@ private:
     QCoreApplication* m_parent;
     QString m_name;
     spdlog::level::level_enum m_logLevel;
-    bool m_noPPMAdj = false;
+    bool m_autoPPM_LSB_Adjust = true;
     bool m_noClockAdj;
     QString m_serverUid;
 
@@ -85,4 +88,7 @@ private:
     bool m_setInitialLocalPPM = true;
     bool m_measurementInProgress = false;
     int m_expectedNofSamples = 0;
+
+    I2C_Access* m_i2c = nullptr;
+    int64_t m_dacLSB = 51000; // oups. fixit
 };

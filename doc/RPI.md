@@ -14,6 +14,12 @@ Used on both client and server, both RPI 3
     sdram_freq=500
     over_voltage=2
     over_voltage_sdram=2
+    
+    # i2c and spi if wanted
+    dtparam=i2c1=on
+    dtparam=i2c_arm=on
+    dtparam=spi=on
+
 
 ## client
 

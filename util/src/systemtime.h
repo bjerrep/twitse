@@ -3,6 +3,10 @@
 #include <cstdint>
 #include <QString>
 
+/* NOTE: this class has two different implementation files:
+   systemtime_vctcxo.cpp  for LUHAB with dac controlled vctcxo
+   systemtime_std.cpp     default standalone
+*/
 
 class SystemTime
 {

@@ -69,6 +69,12 @@ int main(int argc, char *argv[])
         g_developmentMask = (DevelopmentMask) (g_developmentMask | DevelopmentMask::SameHost);
     }
 
+#ifdef VCTCXO
+    trace->info("server build for LUHAB");
+#else
+    trace->info("server build for standalone");
+#endif
+
     trace->info(IMPORTANT "server starting at {} with multicast at {}:{}" RESET,
                 Interface::getLocalAddress().toString().toStdString(),
                 address.toString().toStdString(),

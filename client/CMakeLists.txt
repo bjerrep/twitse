@@ -5,7 +5,15 @@ project(client)
 find_package(Qt5Core)
 find_package(Qt5Network)
 
-file(GLOB_RECURSE sources src/*)
+option(VCTCXO "DAC and voltage controlled processor crystal" OFF)
+
+if (VCTCXO)
+    message(STATUS "client DAC/VCTCXO enabled")
+    add_definitions(-DVCTCXO)
+    file(GLOB vctcxo_sources src/i2c_access*)
+endif()
+
+file(GLOB sources src/client* src/main.cpp)
 
 include_directories(
     ../util/src
@@ -16,6 +24,7 @@ include_directories(
 add_executable(
     ${PROJECT_NAME}
     ${sources}
+    ${vctcxo_sources}
     )
 
 target_link_libraries(

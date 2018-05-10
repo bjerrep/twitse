@@ -37,7 +37,8 @@ int main(int argc, char *argv[])
         {"port", "multicast port", "port"},
         {"id", "client name", "id"},
         {"noclockadj", "dont adjust the clock"},
-        {"fixedppm", "use a fixed ppm value", "fixedppm"},
+        // can be set at runtime with control application
+        {"fixedadjust", "use a fixed ppm value", "fixedadjust"},
         {"loglevel", "0:error 1:info(default) 2:debug 3:all", "loglevel"}
     });
     parser.process(app);
@@ -49,12 +50,12 @@ int main(int argc, char *argv[])
     }
     bool no_clock_adj = parser.isSet("noclockadj");
 
-    double fixed_ppm = 0.0;
-    bool use_fixed_ppm = false;
-    if (!parser.value("fixedppm").isNull())
+    double fixed_adjust = 0.0;
+    bool use_fixed_adjust = false;
+    if (!parser.value("fixedadjust").isNull())
     {
-        fixed_ppm = parser.value("fixedppm").toDouble();
-        use_fixed_ppm = true;
+        fixed_adjust = parser.value("fixedadjust").toDouble();
+        use_fixed_adjust = true;
     }
 
     QString name = parser.value("id");
@@ -78,6 +79,12 @@ int main(int argc, char *argv[])
     spdlog::set_level(loglevel);
     spdlog::set_pattern(logformat);
 
+#ifdef VCTCXO
+    trace->info("client build for LUHAB");
+#else
+    trace->info("client build for standalone");
+#endif
+
     trace->info(WHITE "client '{}' starting" RESET, name.toStdString());
 
     trace->info("listening on multicast {}:{} on interface {}",
@@ -92,7 +99,7 @@ int main(int argc, char *argv[])
         trace->critical("unable to set realtime priority");
     }
 
-    Client client(&app, name, address, port, loglevel, no_clock_adj, use_fixed_ppm, fixed_ppm);
+    Client client(&app, name, address, port, loglevel, no_clock_adj, !use_fixed_adjust, fixed_adjust);
 
     return app.exec();
     trace->info("server exits");

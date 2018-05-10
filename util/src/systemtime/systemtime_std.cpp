@@ -1,7 +1,9 @@
-#include "systemtime.h"
+#include "../systemtime.h"
+#include "../log.h"
+
 #include <time.h>
 #include <sys/time.h>
-#include "log.h"
+
 
 double s_ppm = 0.0;
 int64_t s_ppmTime = 0;

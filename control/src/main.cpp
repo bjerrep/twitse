@@ -21,11 +21,13 @@ int main(int argc, char *argv[])
     parser.setApplicationDescription("twitse control");
     parser.addHelpOption();
     parser.addOptions({
-        {"dumpraw", "let client(s) dump all offset measurements to files"},
-        {"clientsummaries", "(server) dump summaries in client files"},
+        {"dumpraw", "let client(s) dump all offset samples in individual measurement files"},
+        {"clientsummaries", "(server) dump measurement summaries in client files. Used for plot data."},
         {"kill", "server, 'client', all", "target"},
         {"silence", "(server) silence in secs between measurements, 0-20 or auto", "silence"},
-        {"samples", "(server) number of samples per measurement, 0-1000 or auto", "samples"}});
+        {"samples", "(server) number of samples per measurement, 0-1000 or auto", "samples"},
+        {"vctcxodac", "(client) set the vctcxo dac to fixed value 0-65535 or auto", "vctcxodac"},
+        {"client", "name of the client (for entries starting with '(client)')", "client"}});
 
     parser.process(app);
     trace->info("transmitting on multicast {}:{}",

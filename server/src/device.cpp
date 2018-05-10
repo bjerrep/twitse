@@ -171,9 +171,16 @@ void Device::processMeasurement(const RxPacket& rx)
 
         trace->debug("{} adjusting ppm {:7.3f} (offset {:7.3f} levelling {:7.3f})",
                      name(), ppm, offset_ppm, levelling_ppm);
-        if (fabs(ppm) > 0.1)
+
+        double ppmLimit = 1.0;
+        if (m_lock.isLock())
         {
-            double newppm = ppm >= 0.1 ? 0.1 : -0.1;
+            ppmLimit = 0.1;
+        }
+
+        if (fabs(ppm) > ppmLimit)
+        {
+            double newppm = ppm >= ppmLimit ? ppmLimit : -ppmLimit;
             trace->warn("large ppm adjustment value {} truncated to {}", ppm, newppm);
             ppm = newppm;
         }
