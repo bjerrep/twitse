@@ -19,7 +19,7 @@ before_script:
   - source $QT_ENV_SCRIPT
   - mkdir external
   - cd external
-  - git submodule add https://github.com/gabime/spdlog.git
+  - git submodule add https://github.com/gabime/spdlog.git -f
   - git submodule update --init
   - cd ..
   - mkdir build
