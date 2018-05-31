@@ -3,8 +3,10 @@
 #include "systemtime.h"
 
 #include <sys/ioctl.h>
-#include <linux/i2c.h>
 #include <linux/i2c-dev.h>
+#ifndef I2C_FUNC_I2C
+#include <linux/i2c.h>
+#endif
 
 
 I2C_Access::I2C_Access(int bus)
