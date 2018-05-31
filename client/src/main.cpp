@@ -14,11 +14,11 @@ DevelopmentMask g_developmentMask = DevelopmentMask::None;
 
 void signalHandler(int signal)
 {
-  void *array[100];
-  size_t entries = backtrace(array, 100);
-  trace->critical("caught signal {}", signal);
-  backtrace_symbols_fd(array, entries, STDOUT_FILENO);
-  exit(EXIT_FAILURE);
+    void *array[100];
+    size_t entries = backtrace(array, 100);
+    trace->critical("caught signal {}", signal);
+    backtrace_symbols_fd(array, entries, STDOUT_FILENO);
+    exit(EXIT_FAILURE);
 }
 
 int main(int argc, char *argv[])
@@ -34,13 +34,13 @@ int main(int argc, char *argv[])
     parser.setApplicationDescription("hardsync client");
     parser.addHelpOption();
     parser.addOptions({
-        {"port", "multicast port", "port"},
-        {"id", "client name", "id"},
-        {"noclockadj", "dont adjust the clock"},
-        // can be set at runtime with control application
-        {"fixedadjust", "use a fixed ppm value", "fixedadjust"},
-        {"loglevel", "0:error 1:info(default) 2:debug 3:all", "loglevel"}
-    });
+                          {"port", "multicast port", "port"},
+                          {"id", "client name", "id"},
+                          {"noclockadj", "dont adjust the clock"},
+                          // can be set at runtime with control application
+                          {"fixedadjust", "use a fixed ppm value", "fixedadjust"},
+                          {"loglevel", "0:error 1:info(default) 2:debug 3:all", "loglevel"}
+                      });
     parser.process(app);
 
     uint16_t port = parser.value("port").toUInt();
@@ -70,27 +70,25 @@ int main(int argc, char *argv[])
     {
         switch (parser.value("loglevel").toInt())
         {
-            case 0 : loglevel = spdlog::level::err; break;
-            case 2 : loglevel = spdlog::level::debug; break;
-            case 3 : loglevel = spdlog::level::trace; break;
-            default : break;
+        case 0 : loglevel = spdlog::level::err; break;
+        case 2 : loglevel = spdlog::level::debug; break;
+        case 3 : loglevel = spdlog::level::trace; break;
+        default : break;
         }
     }
     spdlog::set_level(loglevel);
     spdlog::set_pattern(logformat);
 
 #ifdef VCTCXO
-    trace->info("client build for LUHAB");
+        trace->info("client " WHITE "'{}'" RESET " running in vctcxo mode", name.toStdString());
 #else
-    trace->info("client build for standalone");
+        trace->info("client " WHITE "'{}'" RESET " running in standalone mode", name.toStdString());
 #endif
 
-    trace->info(WHITE "client '{}' starting" RESET, name.toStdString());
-
     trace->info("listening on multicast {}:{} on interface {}",
-        address.toString().toStdString(),
-        port,
-        Interface::getLocalAddress().toString().toStdString());
+                address.toString().toStdString(),
+                port,
+                Interface::getLocalAddress().toString().toStdString());
 
     struct sched_param param;
     param.sched_priority = 99;

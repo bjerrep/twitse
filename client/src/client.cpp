@@ -4,9 +4,7 @@
 #include "systemtime.h"
 #include "interface.h"
 #include "apputils.h"
-#ifdef VCTCXO
 #include "i2c_access.h"
-#endif
 
 #include <QObject>
 #include <QThread>
@@ -15,16 +13,27 @@
 #include <QNetworkDatagram>
 
 extern DevelopmentMask g_developmentMask;
+SystemTime* s_systemTime = nullptr;
 
 
 Client::Client(QCoreApplication *parent, QString name,
                const QHostAddress &address, uint16_t port,
-               spdlog::level::level_enum loglevel, bool no_clock_adj, bool autoPPM_LSB, double fixedPPM_LSB)
+               spdlog::level::level_enum loglevel,
+               bool no_clock_adj, bool autoPPM_LSB, double fixedPPM_LSB)
     : m_parent(parent),
       m_name(name),
       m_logLevel(loglevel),
       m_noClockAdj(no_clock_adj)
 {
+    s_systemTime = new SystemTime(false);
+
+#ifdef VCTCXO
+    m_i2c = new I2C_Access(1);
+    m_i2c->writeVCTCXO_DAC(m_dacLSB);
+    double luhab_temperature = m_i2c->readTemperature();
+    trace->info("luhab carrier board temperature is {:.1f} °C", luhab_temperature);
+#endif
+
     qRegisterMetaType<UdpRxPacketPtr>("UdpRxPacketPtr");
     qRegisterMetaType<TcpRxPacketPtr>("TcpRxPacketPtr");
     qRegisterMetaType<MulticastRxPacketPtr>("MulticastRxPacketPtr");
@@ -33,8 +42,9 @@ Client::Client(QCoreApplication *parent, QString name,
 
     if (!autoPPM_LSB)
     {
-        SystemTime::setPPM(fixedPPM_LSB);
+        s_systemTime->setPPM(fixedPPM_LSB);
         m_dacLSB = fixedPPM_LSB;
+        s_systemTime->setPPM(m_dacLSB);
         m_autoPPM_LSB_Adjust = false;
         trace->info("setting fixed ppm/lsb to to {}", fixedPPM_LSB);
     }
@@ -53,22 +63,13 @@ Client::Client(QCoreApplication *parent, QString name,
     sendServerConnectRequest();
 
     m_SystemTimeRefreshTimer = startTimer(20);
-
-#ifdef VCTCXO
-    m_i2c = new I2C_Access(1);
-    m_i2c->writeLTC2606(m_dacLSB);
-    double luhab_temperature = m_i2c->readTemperature();
-    trace->info("luhab carrier board temperature is {:.1f} °C", luhab_temperature);
-#endif
 }
 
 
 Client::~Client()
 {
     delete m_measurementSeries;
-#ifdef VCTCXO
     delete m_i2c;
-#endif
 }
 
 
@@ -90,8 +91,11 @@ void Client::reset()
     m_udpOverruns = 0;
     m_serverUid = "";
     m_setInitialLocalPPM = true;
-    SystemTime::reset();
+    s_systemTime->reset();
     m_measurementInProgress = false;
+#ifdef VCTCXO
+    m_i2c->writeVCTCXO_DAC(m_dacLSB = 0x8000);
+#endif
 }
 
 
@@ -194,7 +198,7 @@ void Client::executeControl(MulticastRxPacketPtr rx)
         else
         {
             uint16_t dac = value.toUShort();
-            m_i2c->writeLTC2606(dac);
+            m_i2c->writeVCTCXO_DAC(dac);
             trace->info("setting vctcxo to fixed value {} (0x{:04x})", dac, dac);
             m_autoPPM_LSB_Adjust = false;
         }
@@ -217,7 +221,7 @@ void Client::multicastTx(MulticastTxPacket tx)
 
 void Client::udpRx()
 {
-    int64_t localTime = SystemTime::getSystemTime();
+    int64_t localTime = s_systemTime->getUpdatedSystemTime();
     int64_t remoteTime = *((int64_t*) m_udpSocket->receiveDatagram().data().data());
 
     m_measurementSeries->add(remoteTime, localTime);
@@ -301,10 +305,18 @@ void Client::tcpRx()
             else
             {
                 int64_t epoc_ns = rx.value("adjust_ns").toLongLong();
+
                 if (epoc_ns)
                 {
                     trace->info(WHITE "adjusting clock with {} ns" RESET, epoc_ns);
-                    SystemTime::adjustSystemTime(epoc_ns);
+
+#ifdef CLIENT_USING_REALTIME
+                    int64_t tt = s_systemTime->getWallClock() + epoc_ns;
+                    struct timespec ts = {(__time_t) (tt / SystemTimeNS_IN_SEC), (__syscall_slong_t) (tt % NS_IN_SEC)};
+                    clock_settime(CLOCK_REALTIME, &ts);
+#else
+                    s_systemTime->adjustSystemTime(epoc_ns);
+#endif
                 }
                 else
                 {
@@ -365,14 +377,14 @@ void Client::tcpTx(const std::string& command)
 void Client::adjustPPM(double ppm)
 {
 #ifndef VCTCXO
-    SystemTime::setPPM(ppm);
-    return;
+    s_systemTime->setPPM(ppm);
 #else
     if (!m_autoPPM_LSB_Adjust)
     {
         return;
     }
-    const double lsb_per_ppm = 4000.0;
+    // vctcxo "ASVTX-11-121-19.200MHz-T", nomimal +/-8ppm
+    const double lsb_per_ppm = 2800.0;
 
     int64_t dacLSBcopy = m_dacLSB;
 
@@ -391,9 +403,8 @@ void Client::adjustPPM(double ppm)
         trace->critical("dac is saturated");
     }
 
-    m_i2c->writeLTC2606(m_dacLSB);
-    SystemTime::setPPM(m_dacLSB);
-    trace->info("ppm adjusted {} from {} to {} lsb", m_dacLSB - dacLSBcopy, dacLSBcopy, m_dacLSB);
+    m_i2c->writeVCTCXO_DAC(m_dacLSB);
+    trace->debug("ppm adjusted {} from {} to {} lsb", m_dacLSB - dacLSBcopy, dacLSBcopy, m_dacLSB);
 #endif
 }
 
@@ -423,10 +434,12 @@ void Client::timerEvent(QTimerEvent* timerEvent)
 
     if (timerid == m_SystemTimeRefreshTimer)
     {
+#ifndef VCTCXO
         if (!m_measurementInProgress)
         {
-            SystemTime::getSystemTime();
+            s_systemTime->getUpdatedSystemTime();
         }
+#endif
     }
     else if (timerid == m_reconnectTimer)
     {
@@ -446,11 +459,6 @@ void Client::timerEvent(QTimerEvent* timerEvent)
     {
         tcpTx("ping");
     }
-    else if (timerid == m_timerSendTime)
-    {
-        sendLocalTimeUDP();
-        timerOff(this, m_timerSendTime);
-    }
     else
     {
         trace->warn("got unexpected timer event");
@@ -460,7 +468,7 @@ void Client::timerEvent(QTimerEvent* timerEvent)
 
 void Client::sendLocalTimeUDP()
 {
-    int64_t epoch = SystemTime::getSystemTime();
+    int64_t epoch = s_systemTime->getUpdatedSystemTime();
     m_udpSocket->writeDatagram((const char *) &epoch, sizeof(int64_t), m_serverAddress, m_serverTcpPort);
 }
 

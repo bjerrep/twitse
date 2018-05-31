@@ -20,7 +20,6 @@ int main(int argc, char *argv[])
     g_developmentMask = (DevelopmentMask) (DevelopmentMask::AnalysisAppendToSummary);
 
     // get naturally sorted list
-    QString whereami = QDir::currentPath();
     QProcess ls;
     ls.start("sh -c \"ls ../../dataanalysis/data/1hour_throttle_on/server/raw_clienttime* -v1\"");
     ls.waitForFinished();

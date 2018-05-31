@@ -39,15 +39,17 @@ The entire system consisting of server and client means running root processes w
 After the git clone add spdlog in-tree as a git submodule:
 
     mkdir external && cd external
-    git submodule add https://github.com/gabime/spdlog.git
+    git submodule add -f https://github.com/gabime/spdlog.git
     git submodule update --init
+    
 
-Otherwise its a standard cmake project. Make an out-of-source build
+Otherwise its a standard cmake project. Dependencies are qt5-base and  probably i2c-dev. Make an out-of-source build
 
     mkdir build && cd build
     cmake .. -DCMAKE_BUILD_TYPE=release
     make (client|server)
-Experiment with a -j# switch. (4 concurrent compilations might be too much)
+    
+Experiment with a -j# switch if building on a rpi. (4 concurrent compilations might be too much)
 
 A full build produces 4 binaries, server, client, control and dataanalysis.
 

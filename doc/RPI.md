@@ -27,16 +27,20 @@ Turn wifi power save off. The RPI is said not to support it but it seems to do s
 
 	iwconfig wlan0 power off
 
+Make persistent as udev rule _/etc/udev/rules.d/70-wifi-powersave.rules_
+
+    ACTION=="add", SUBSYSTEM=="net", KERNEL=="wlan*", RUN+="/usr/bin/iw dev %k set power_save off"
+
 ## server & client
 
 Stop anything sounding like ntp or systemd-timesyncd or the like.
 
 
-## note
+## other
 
 backup a sd card
 
-dd bs=4M if=/dev/mmcblk0 | gzip > ludit_arch64_`date +%d%m%y`.gz
+dd bs=4M if=/dev/mmcblk0 status=progress | <name>_`date +%Y%m%d.gz`
 
 restore
 

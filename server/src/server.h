@@ -36,6 +36,9 @@ private:
     Multicast* m_multicast;
     DeviceManager m_deviceManager;
     int m_statusReportTimer = TIMEROFF;
+#ifdef VCTCXO
+    int m_adjustToWallClockTimer = TIMEROFF;
+#endif
     bool m_pendingStatusReport = false;
     QString m_uid = QUuid::createUuid().toString();
 };

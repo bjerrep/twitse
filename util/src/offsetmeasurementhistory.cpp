@@ -135,7 +135,7 @@ double OffsetMeasurementHistory::getLastTimespan_sec() const
 {
     return (m_offsetMeasurements.at(nofMeasurements() - 1).m_endtime_ns -
             m_offsetMeasurements.at(nofMeasurements() - 2).m_endtime_ns)
-            / SystemTime::NS_IN_SEC_F;
+            / NS_IN_SEC_F;
 }
 
 
@@ -153,7 +153,7 @@ double OffsetMeasurementHistory::getSD_us() const
 double OffsetMeasurementHistory::getTimeSpan_sec() const
 {
     return (m_offsetMeasurements.back().m_endtime_ns - m_offsetMeasurements.front().m_endtime_ns) /
-            SystemTime::NS_IN_SEC_F;
+            NS_IN_SEC_F;
 }
 
 
@@ -176,20 +176,22 @@ std::string OffsetMeasurementHistory::toString() const
     double package_loss = 100.0 * last_measurement.m_usedSamples / last_measurement.m_collectedSamples;
 
 #ifdef VCTCXO
-    return fmt::format("{:-3d} runtime {:5.1f} samples/used {}/{:4.1f}% secs/size {:5.1f}/{} offset_us {:-5.1f} avgoff_us {:-5.1f}"
-                       " ppm {:-7.3f} avgppm {:-7.3f} sd_us {:-5.1f} vctcxo {:0f}",
-                       m_loop, SystemTime::getRunningTime_secs(), m_totalMeasurements, package_loss,
+    return fmt::format("{:-3d} runtime {:5.1f} samples/used {}/{:4.1f}% secs/size {:5.1f}/{} "
+                       "offset_us {:-5.1f} avgoff_us {:-5.1f}"
+                       " ppm {:-7.3f} avgppm {:-7.3f} sd_us {:-5.1f} vctcxo {:.0f}",
+                       m_loop, s_systemTime->getRunningTime_secs(), m_totalMeasurements, package_loss,
                        getTimeSpan_sec(), m_offsetMeasurements.size(),
                        offset_us, m_movingAverageOffset_ns/1000.0,
                        getPPM(), m_averageSlope * 1000000.0, m_sd_ns/1000.0,
-                       SystemTime::getPPM());
+                       s_systemTime->getPPM());
 #else
-    return fmt::format("{:-3d} runtime {:5.1f} samples/used {}/{:4.1f}% secs/size {:5.1f}/{} offset_us {:-5.1f} avgoff_us {:-5.1f}"
+    return fmt::format("{:-3d} runtime {:5.1f} samples/used {}/{:4.1f}% secs/size {:5.1f}/{} "
+                       "offset_us {:-5.1f} avgoff_us {:-5.1f}"
                        " ppm {:-7.3f} avgppm {:-7.3f} sd_us {:-5.1f} systimeppm {:-7.3f}",
-                       m_loop, SystemTime::getRunningTime_secs(), m_totalMeasurements, package_loss,
+                       m_loop, s_systemTime->getRunningTime_secs(), m_totalMeasurements, package_loss,
                        getTimeSpan_sec(), m_offsetMeasurements.size(),
                        offset_us, m_movingAverageOffset_ns/1000.0,
                        getPPM(), m_averageSlope * 1000000.0, m_sd_ns/1000.0,
-                       SystemTime::getPPM());
+                       s_systemTime->getPPM());
 #endif
 }

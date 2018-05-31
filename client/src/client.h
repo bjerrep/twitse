@@ -77,7 +77,6 @@ private:
     int m_reconnectTimer = TIMEROFF;
     int m_serverPingTimer = TIMEROFF;
     int m_clientPingTimer = TIMEROFF;
-    int m_timerSendTime = TIMEROFF;
     int m_SystemTimeRefreshTimer = TIMEROFF;
 
     BasicMeasurementSeries* m_measurementSeries = nullptr;
@@ -90,5 +89,5 @@ private:
     int m_expectedNofSamples = 0;
 
     I2C_Access* m_i2c = nullptr;
-    int64_t m_dacLSB = 51000; // oups. fixit
+    int64_t m_dacLSB = 0x8000;
 };

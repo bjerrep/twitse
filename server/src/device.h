@@ -18,12 +18,13 @@ class QTcpServer;
 class QTcpSocket;
 class QUdpSocket;
 
+
 class StatusReport
 {
 public:
     StatusReport()
     {
-        m_startTime = SystemTime::getRunningTime_secs();
+        m_startTime = s_systemTime->getRunningTime_secs();
     }
 
     void newMeasurement(int sent, int received, int used)
@@ -40,7 +41,7 @@ public:
 
     std::string getReport() const
     {
-        double elapsed = SystemTime::getRunningTime_secs() - m_startTime;
+        double elapsed = s_systemTime->getRunningTime_secs() - m_startTime;
         std::string loss = "loss ?";
         std::string used = "used ?";
 
@@ -101,7 +102,7 @@ public:
     QString m_name;
     QTcpServer* m_server;
     QByteArray m_tcpReadBuffer;
-    QTcpSocket *m_socket;
+    QTcpSocket *m_tcpSocket;
     int m_clientActiveTimer = TIMEROFF;
     int m_sampleRunTimer = TIMEROFF;
     int m_clientPingTimer = TIMEROFF;

@@ -16,13 +16,17 @@
 #include <iostream>
 
 extern DevelopmentMask g_developmentMask;
+SystemTime* s_systemTime = nullptr;
 
 int g_clientPeriod = -1;
 int g_clientSamples = -1;
 
+
 Server::Server(QCoreApplication *parent, QString id, const QHostAddress &address, uint16_t port)
     : m_parent(parent)
 {
+    s_systemTime = new SystemTime(true);
+
     m_multicastThread = new QThread(parent);
     m_multicast = new Multicast("no1", address, port);
 
@@ -40,7 +44,10 @@ Server::Server(QCoreApplication *parent, QString id, const QHostAddress &address
     connect(&m_deviceManager, &DeviceManager::signalIdle, this, &Server::slotIdle );
 
     m_statusReportTimer = startTimer(g_statusReport);
-    SystemTime::reset();
+    #ifdef VCTCXO
+        m_adjustToWallClockTimer = startTimer(50);
+    #endif
+    s_systemTime->reset();
 }
 
 
@@ -117,7 +124,7 @@ void Server::printStatusReport()
     if (m_pendingStatusReport && !m_deviceManager.activeClients())
     {
         m_pendingStatusReport = false;
-        std::string dhms = QDateTime::fromTime_t(SystemTime::getRunningTime_secs()).toUTC().toString("dd:hh:mm:ss").toStdString();
+        std::string dhms = QDateTime::fromTime_t(s_systemTime->getRunningTime_secs()).toLocalTime().toString("dd:hh:mm:ss").toStdString();
         trace->info(CYAN "    runtime {}, cputemp {:.1f}" RESET,
                     dhms,
                     System::cpuTemperature());
@@ -140,4 +147,10 @@ void Server::timerEvent(QTimerEvent* timerEvent)
         m_pendingStatusReport = true;
         printStatusReport();
     }
+#ifdef VCTCXO
+    else if (id == m_adjustToWallClockTimer)
+    {
+        s_systemTime->adjustSystemTime(0);
+    }
+#endif
 }

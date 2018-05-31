@@ -13,6 +13,7 @@ install:
   - sudo apt-get install -qq g++-6
   - sudo apt-get --yes install qt59-meta-minimal
   - if [ "$CXX" = "g++" ]; then export CXX="g++-6" CC="gcc-6"; fi
+  - sudo apt-get install libi2c-dev
 
 before_script:
   - QT_ENV_SCRIPT=$(find /opt -name 'qt*-env.sh')

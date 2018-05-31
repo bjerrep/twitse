@@ -1,5 +1,6 @@
 #include "i2c_access.h"
 #include "log.h"
+#include "systemtime.h"
 
 #include <sys/ioctl.h>
 #include <linux/i2c.h>
@@ -28,11 +29,28 @@ I2C_Access::~I2C_Access()
     close(m_descriptor);
 }
 
-void I2C_Access::writeLTC2606(uint16_t value)
+
+void I2C_Access::writeMAX5217BGUA(uint16_t value)
 {
-    const uint8_t LTC2606 = 0x1D;
+    const uint8_t MAX5217 = 0x1D;
 
     uint8_t tx[] = {0x01, (uint8_t) (value >> 8), (uint8_t) (value & 0x00FF)};
+
+    if (ioctl(m_descriptor, I2C_SLAVE, MAX5217) < 0)
+    {
+        trace->warn("unable to setup i2c:0x{:02x}", MAX5217);
+        return;
+    }
+
+    write(m_descriptor, tx, 3);
+}
+
+
+void I2C_Access::writeLTC2606IDD1(uint16_t value)
+{
+    const uint8_t LTC2606 = 0x10;
+
+    uint8_t tx[] = {0x30, (uint8_t) (value >> 8), (uint8_t) (value & 0x00FF)};
 
     if (ioctl(m_descriptor, I2C_SLAVE, LTC2606) < 0)
     {
@@ -53,19 +71,19 @@ double I2C_Access::readTemperature()
 
     struct i2c_msg msgs[2] = // uses repeated start
     {
-        {
-            .addr = DS1775R1_TR,
-            .flags = 0,
-            .len = 1,
-            .buf = &temperaturePointer
-        },
-        {
-            .addr = DS1775R1_TR,
-            .flags = I2C_M_RD,
-            .len = 2,
-            .buf = (uint8_t*) &reading
-        }
-    };
+    {
+        .addr = DS1775R1_TR,
+        .flags = 0,
+        .len = 1,
+        .buf = &temperaturePointer
+    },
+    {
+        .addr = DS1775R1_TR,
+        .flags = I2C_M_RD,
+        .len = 2,
+        .buf = (uint8_t*) &reading
+    }
+};
 
     struct i2c_rdwr_ioctl_data data = {
         .msgs = msgs,
@@ -74,11 +92,19 @@ double I2C_Access::readTemperature()
 
     if (ioctl(m_descriptor, I2C_RDWR, &data) < 0)
     {
-        trace->warn("temperature reading failed");
+        trace->warn("luhab board temperature reading failed");
         return 0.0;
     }
 
     double temperature = __bswap_16(reading) / 256.0;
     return temperature;
+}
+
+
+void I2C_Access::writeVCTCXO_DAC(uint16_t value)
+{
+    s_systemTime->setPPM(value);
+    writeMAX5217BGUA(value);
+    //writeLTC2606IDD1(value);
 }
 

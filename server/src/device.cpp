@@ -70,7 +70,7 @@ Device::~Device()
 
 void Device::sendServerTimeUDP()
 {
-    int64_t epoch = SystemTime::getSystemTime();
+    int64_t epoch = s_systemTime->getUpdatedSystemTime();
     m_udp->writeDatagram((const char *) &epoch, sizeof(int64_t), m_clientAddress, m_clientTcpPort);
     m_clientPingCounter = g_serverPingPeriod / 500;
     m_statusReport.packetSentOrReceived();
@@ -147,12 +147,22 @@ void Device::processMeasurement(const RxPacket& rx)
 
     if (m_ppmActive)
     {
-        double magicnumber1 = 400.0;
-        double offset_ppm = - clientoffset_us / magicnumber1;
+        // experimental constants.
+#ifdef VCTCXO
+        double magicnumber_zero = 400;
+        double magicnumber_antislope = 15;
+        double magicnumber_hilock_throttle = 1.0;
+        double magicnumber_lock_throttle = 1.0;
+#else
+        double magicnumber_zero = 800;
+        double magicnumber_antislope = 10000;
+        double magicnumber_hilock_throttle = 4;
+        double magicnumber_lock_throttle = 2;
+#endif
+        double offset_ppm = - clientoffset_us / magicnumber_zero;
 
-        double magicnumber2 = 15;
         double deltatime = m_offsetMeasurementHistory->getLastTimespan_sec();
-        double levelling_ppm = - (clientoffset_us - m_prev) / (deltatime * magicnumber2);
+        double levelling_ppm = - (clientoffset_us - m_prev) / (deltatime * magicnumber_antislope);
 
         double ppm = offset_ppm + levelling_ppm;
 
@@ -160,19 +170,17 @@ void Device::processMeasurement(const RxPacket& rx)
 
         if (m_lock.isHiLock())
         {
-            double magicnumber3 = 1.5;
-            ppm /= magicnumber3;
+            ppm /= magicnumber_hilock_throttle;
         }
         else if (m_lock.isLock())
         {
-            double magicnumber4 = 1.2;
-            ppm /= magicnumber4;
+            ppm /= magicnumber_lock_throttle;
         }
 
         trace->debug("{} adjusting ppm {:7.3f} (offset {:7.3f} levelling {:7.3f})",
                      name(), ppm, offset_ppm, levelling_ppm);
 
-        double ppmLimit = 1.0;
+        double ppmLimit = 0.2;
         if (m_lock.isLock())
         {
             ppmLimit = 0.1;
@@ -184,6 +192,7 @@ void Device::processMeasurement(const RxPacket& rx)
             trace->warn("large ppm adjustment value {} truncated to {}", ppm, newppm);
             ppm = newppm;
         }
+
         QJsonObject json;
         json["command"] = "adjustppm";
         json["ppm_adjust"] = QString::number(ppm);
@@ -194,12 +203,13 @@ void Device::processMeasurement(const RxPacket& rx)
 
     std::string message = fmt::format(
                 WHITE "{} {:-3d} runtime {:5.1f} roundtrip_us {:5.1f} "
-                "sd_us {:5.1f} period_sec {:2} silence_sec {:2} samples {:4} avgoffs_us {:5.1f} "
-                "offset_us " YELLOW "{:5.1f}" RESET,
-                name(), m_offsetMeasurementHistory->getCounter(), SystemTime::getRunningTime_secs(),
+                      "sd_us {:5.1f} period_sec {:2} silence_sec {:2} samples {:4} avgoffs_us {:5.1f} "
+                      "offset_us " YELLOW "{:5.1f}" RESET,
+                name(), m_offsetMeasurementHistory->getCounter(), s_systemTime->getRunningTime_secs(),
                 roundtrip_us,
                 m_offsetMeasurementHistory->getSD_us(),
-                m_lock.getMeasurementPeriodsecs(), m_lock.getInterMeasurementDelaySecs(), m_lock.getNofSamples(), m_avgClientOffset, clientoffset_us);
+                m_lock.getMeasurementPeriodsecs(), m_lock.getInterMeasurementDelaySecs(), m_lock.getNofSamples(),
+                m_avgClientOffset, clientoffset_us);
 
     trace->info(message);
 
@@ -222,6 +232,13 @@ void Device::processMeasurement(const RxPacket& rx)
     if (m_clockAdjust > 0 && --m_clockAdjust == 0)
     {
         int64_t client_adjustment_ns = (int64_t) client2server_ns - roundtrip_ns / 2;
+
+#ifdef VCTCXO
+        int64_t localRawToWallOffset = s_systemTime->getWallClock() - s_systemTime->getRawSystemTime();
+        s_systemTime->adjustSystemTime(localRawToWallOffset);
+        client_adjustment_ns += localRawToWallOffset;
+#endif
+
         m_averagesInitialized = false;
         m_ppmActive = true;
 
@@ -283,7 +300,7 @@ void Device::tcpTx(const QJsonObject& json)
         return;
     }
 
-    if (!m_socket)
+    if (!m_tcpSocket)
     {
         trace->error("cant write to socket with no client");
         return;
@@ -291,20 +308,20 @@ void Device::tcpTx(const QJsonObject& json)
 
     TcpTxPacket tx(json);
 
-    if (!m_socket->isWritable())
+    if (!m_tcpSocket->isWritable())
     {
         trace->warn("tcp socket not writable?");
         clientDisconnected();
         return;
     }
 
-    if (m_socket->state() != QAbstractSocket::ConnectedState)
+    if (m_tcpSocket->state() != QAbstractSocket::ConnectedState)
     {
-        trace->warn("tcp socket not in connected state ? ({})", m_socket->state());
+        trace->warn("tcp socket not in connected state ? ({})", m_tcpSocket->state());
         clientDisconnected();
         return;
     }
-    m_socket->write(tx.getData());
+    m_tcpSocket->write(tx.getData());
     m_statusReport.packetSentOrReceived();
 
     m_clientPingCounter = g_serverPingPeriod / 500;
@@ -326,7 +343,7 @@ void Device::slotTcpRx()
         return;
     }
 
-    m_tcpReadBuffer += m_socket->readAll();
+    m_tcpReadBuffer += m_tcpSocket->readAll();
 
     while(true)
     {
@@ -386,17 +403,6 @@ void Device::slotTcpRx()
         {
             sampleRunComplete();
         }
-        else if (command == "UNLOCKED")
-        {
-            trace->info("UNLOCK");
-        }
-        else if (command == "LOCKED")
-        {
-        }
-        else if (command == "LOCKACQUIRED")
-        {
-            trace->info("LOCK ACQUIRED");
-        }
         else
         {
             accepted = false;
@@ -413,7 +419,7 @@ void Device::slotTcpRx()
 
 void Device::slotUdpRx()
 {
-    int64_t localTime = SystemTime::getSystemTime();
+    int64_t localTime = s_systemTime->getUpdatedSystemTime();
     int64_t serverTime = *((int64_t*) m_udp->receiveDatagram().data().data());
 
     processTimeSample(serverTime, localTime);
@@ -473,18 +479,18 @@ std::string Device::name() const
 void Device::slotClientConnected()
 {
     m_clientConnected = true;
-    m_socket = m_server->nextPendingConnection();
-    m_socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
-    m_clientAddress = QHostAddress(m_socket->peerAddress().toIPv4Address());
-    m_clientTcpPort = m_socket->peerPort();
+    m_tcpSocket = m_server->nextPendingConnection();
+    m_tcpSocket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
+    m_clientAddress = QHostAddress(m_tcpSocket->peerAddress().toIPv4Address());
+    m_clientTcpPort = m_tcpSocket->peerPort();
 
     trace->info(IMPORTANT "client '{}' connected from {}:{}" RESET,
                 name(), m_clientAddress.toString().toStdString(), m_clientTcpPort);
 
-    connect(m_socket, &QTcpSocket::readyRead, this, &Device::slotTcpRx);
+    connect(m_tcpSocket, &QTcpSocket::readyRead, this, &Device::slotTcpRx);
 
-    connect(m_socket, &QAbstractSocket::disconnected,
-            m_socket, &QObject::deleteLater);
+    connect(m_tcpSocket, &QAbstractSocket::disconnected,
+            m_tcpSocket, &QObject::deleteLater);
 }
 
 

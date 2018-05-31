@@ -10,7 +10,7 @@ ClientSampleRun::ClientSampleRun(const QString &client, int count)
     : m_name(client),
       m_count(count)
 {
-    m_startTime = SystemTime::getRunningTime_secs();
+    m_startTime = s_systemTime->getRunningTime_secs();
 }
 
 
@@ -45,7 +45,7 @@ void Samples::timerEvent(QTimerEvent *)
         {
             trace->debug("{} sample run completed in {:.1f} secs",
                          (*m_client_it)->m_name.toStdString(),
-                         SystemTime::getRunningTime_secs() - (*m_client_it)->m_startTime);
+                         s_systemTime->getRunningTime_secs() - (*m_client_it)->m_startTime);
             emit signalSampleRunStatusUpdate((*m_client_it)->m_name, false);
             if (m_sampleRuns.contains(*m_client_it))
             {

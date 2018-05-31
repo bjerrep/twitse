@@ -4,6 +4,8 @@
 
 #define ISUSED __attribute__((__unused__))
 
+#define INLINE __attribute__((always_inline))
+
 ISUSED static const char* g_multicastIp = "225.168.1.102";
 const uint16_t g_multicastPort = 45654;
 
@@ -23,6 +25,9 @@ const int g_maxNofSamples = 1000;
 const int g_maxMeasurementPeriod_sec = 30;
 
 static const int TIMEROFF = -1;
+
+static const int64_t NS_IN_SEC = 1000000000LL;
+static constexpr double NS_IN_SEC_F = 1000000000.0;
 
 enum DevelopmentMask
 {

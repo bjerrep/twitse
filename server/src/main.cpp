@@ -2,7 +2,6 @@
 #include "log.h"
 #include "globals.h"
 #include "interface.h"
-
 #include <signal.h>
 #include <execinfo.h>
 
@@ -39,10 +38,10 @@ int main(int argc, char *argv[])
     parser.setApplicationDescription("hardsync server");
     parser.addHelpOption();
     parser.addOptions({
-          {"port", "multicast port", "port"},
-          {"loglevel", "0:error 1:info(default) 2:debug 3:all", "loglevel"},
-          {"samehost", "both server and client runs on the same host, accept unexpected measurements"}
-      });
+                          {"port", "multicast port", "port"},
+                          {"loglevel", "0:error 1:info(default) 2:debug 3:all", "loglevel"},
+                          {"samehost", "both server and client runs on the same host, accept unexpected measurements"}
+                      });
     parser.process(app);
 
     uint16_t port = parser.value("port").toUInt();
@@ -70,9 +69,9 @@ int main(int argc, char *argv[])
     }
 
 #ifdef VCTCXO
-    trace->info("server build for LUHAB");
+    trace->info("server running in vctcxo mode");
 #else
-    trace->info("server build for standalone");
+    trace->info("server running in standalone mode");
 #endif
 
     trace->info(IMPORTANT "server starting at {} with multicast at {}:{}" RESET,

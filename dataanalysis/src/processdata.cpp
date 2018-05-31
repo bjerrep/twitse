@@ -9,6 +9,7 @@
 #include <QStringList>
 #include <QFile>
 
+SystemTime* s_systemTime = nullptr;
 
 DataAnalyse::DataAnalyse(MeasurementSeriesBase* server_calc,
                          MeasurementSeriesBase *client_calc,
