@@ -22,7 +22,10 @@ When running in VCTCXO mode all timing is based on the unmodifiable CLOCK_MONOTO
 
 ## Building & Running
 
-For building see elsewhere. When launcing add "--vctcxo" when starting server and client.
+For building see elsewhere exept when invoking cmake which is now:
+
+    cmake .. -DCMAKE_BUILD_TYPE=release -DVCTCXO=on
+
     
 
     
