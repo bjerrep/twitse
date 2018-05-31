@@ -186,7 +186,7 @@ void Device::processMeasurement(const RxPacket& rx)
             ppmLimit = 0.1;
         }
 
-        if (fabs(ppm) > ppmLimit)
+        if (std::fabs(ppm) > ppmLimit)
         {
             double newppm = ppm >= ppmLimit ? ppmLimit : -ppmLimit;
             trace->warn("large ppm adjustment value {} truncated to {}", ppm, newppm);

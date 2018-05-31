@@ -33,7 +33,7 @@ public:
 
         int64_t offset = - (systime - s_ppmTime) * s_ppm  / 1000000.0;
 
-        if ((abs(offset) > 500000) || adjustment_ns)
+        if ((std::abs(offset) > 500000) || adjustment_ns)
         {
             const int empirical_rpi3_correction = 10000;
             int64_t new_kernel_time = systime + offset + adjustment_ns + empirical_rpi3_correction;

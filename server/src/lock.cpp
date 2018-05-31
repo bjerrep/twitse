@@ -101,14 +101,14 @@ Lock::LockState Lock::errorOffset(double offset)
     LockState lockState = m_lockState;
     const int LOCK_COUNTS = 3;
 
-    if (fabs(offset) < UNLOCK_THRESHOLD)
+    if (std::fabs(offset) < UNLOCK_THRESHOLD)
     {
         if (m_counter < LOCK_COUNTS)
         {
             m_lockState = UNLOCKED;
             ++m_counter;
         }
-        else if (fabs(offset) < HILOCK_THRESHOLD)
+        else if (std::fabs(offset) < HILOCK_THRESHOLD)
         {
             if (++m_counter >= LOCK_COUNTS + 2)
             {
@@ -120,7 +120,7 @@ Lock::LockState Lock::errorOffset(double offset)
                 m_lockState = LOCKED;
             }
         }
-        else if (fabs(offset) < STDLOCK_THRESHOLD)
+        else if (std::fabs(offset) < STDLOCK_THRESHOLD)
         {
             m_counter = LOCK_COUNTS;
             m_quality /= 2;
