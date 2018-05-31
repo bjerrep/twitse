@@ -4,8 +4,11 @@
 
 #include <sys/ioctl.h>
 #include <linux/i2c-dev.h>
+#define I2CBUFPTR char
 #ifndef I2C_FUNC_I2C
 #include <linux/i2c.h>
+#undef I2CBUFPTR
+#define I2CBUFPTR uint8_t
 #endif
 
 
@@ -77,13 +80,13 @@ double I2C_Access::readTemperature()
         .addr = DS1775R1_TR,
         .flags = 0,
         .len = 1,
-        .buf = &temperaturePointer
+        .buf = (I2CBUFPTR*) &temperaturePointer
     },
     {
         .addr = DS1775R1_TR,
         .flags = I2C_M_RD,
         .len = 2,
-        .buf = (uint8_t*) &reading
+        .buf = (I2CBUFPTR*) &reading
     }
 };
 
