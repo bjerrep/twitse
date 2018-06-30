@@ -11,3 +11,11 @@ The following graph shows an hour of measurements on a plain 2.4GHz wifi. It is 
 
 There are some more words [here](doc/TLDR.md) (standalone) and [here](doc/VCTCXO.md) (VCTCXO).
 
+<br /><br /><br />
+
+## Assorted links
+PTPD on wireless raspberry pi 2. 50us precision back then so it might be even better now. This project was made before (!) spotting that discussion:
+https://sourceforge.net/p/ptpd/discussion/469208/thread/74b512c5/
+
+Frequency stability on raspberry 2 with some nice plots:
+https://2n3904blog.com/raspberry-pi-2-frequency-stability/

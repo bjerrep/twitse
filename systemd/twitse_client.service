@@ -1,0 +1,13 @@
+[Unit]
+Description=twitse client
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=<git root>
+ExecStart=<git root>/build/client/client --id left
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

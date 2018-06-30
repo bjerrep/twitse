@@ -65,6 +65,17 @@ Both server and client raspberry pi needs to get overclocked and run continuesly
 
 Then its just left to start the server and the client. They should run as root as they run with realtime scheduling, and the client additionally needs root priviledges to adjust its system clock.
 
+### systemd 
+
+There are template service scripts for server and client in ./systemd. Edit to get the paths straight and then make a symlink to them from /etc/systemd/system:
+
+    ln -s <twitse path>/systemd/twitse_<client|server>.service /etc/systemd/system
+    
+Remember to run 'systemctl enable <service>' if twitse should run at boot.
+
+Use 'journalctl -f' to run a tail to see the console output once the client or server is running as a service.
+
+
 ## generating a plot
 
 The server generates a raw_'clientname'_client_summary.data file if its told to do so with the command
