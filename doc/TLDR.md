@@ -85,4 +85,15 @@ If located in ./doc/gnuplot the demo plot can be made with gnuplot with the foll
 
     gnuplot -c offset_and_sample_size.gp ../../dataanalysis/data/1hourplot/server/raw_test_client_summary.data
 
+## webmonitor
+
+A client side only webpage that connects to the server via a websocket and plots a nice graph over the current offsets. Once clients and server are running silently as services on raspberry pi computers this is page is one way to quickly figure out how the little buggers are behaving.
+
+<p align="center"><img src="images/webmonitor.png"></p>
+
+Launch
+
+    webmonitor/webmonitor.html
     
+in a browser. Edit it to give it the correct server ip address.
+

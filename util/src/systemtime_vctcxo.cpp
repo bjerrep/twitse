@@ -10,7 +10,7 @@
 
 void SystemTime::adjustSystemTime(int64_t adjustment_ns)
 {
-    m_rawOffset += adjustment_ns;
+    m_monotonicClockOffset += adjustment_ns;
     m_resetTime += adjustment_ns;
 }
 

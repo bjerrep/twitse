@@ -6,7 +6,7 @@ data
 
 # various build folders, e.g rpi build folders over network shares
 build*
-
+bin
 
 #spdlog
 external

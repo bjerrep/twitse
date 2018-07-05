@@ -3,6 +3,7 @@
 #include "systemtime.h"
 #include "log.h"
 #include "basicoffsetmeasurement.h"
+#include "websocket.h"
 
 #include <QTcpServer>
 
@@ -12,6 +13,8 @@ DeviceManager::DeviceManager()
             this, &DeviceManager::slotSendTimeSample);
     connect(&m_samples, &Samples::signalSampleRunStatusUpdate,
             this, &DeviceManager::slotSampleRunStatusUpdate);
+
+    m_webSocket = new WebSocket(12343);
 }
 
 
@@ -47,10 +50,10 @@ void DeviceManager::process(const MulticastRxPacketPtr rx)
 
     if (command == "connect")
     {
-        trace->info("got connect request from '{}' at {}", from.toStdString(), rx->value("endpoint").toStdString());
+        trace->info("[{}] connection request on {}", from.toStdString(), rx->value("endpoint").toStdString());
         if (findDevice(from))
         {
-            trace->warn("device '{}' already registered - connection request ignored", from.toStdString());
+            trace->warn("[{}] already registered - connection request ignored", from.toStdString());
             return;
         }
         Device* newDevice = new Device(this, from);
@@ -58,6 +61,7 @@ void DeviceManager::process(const MulticastRxPacketPtr rx)
 
         connect(newDevice, &Device::signalRequestSamples, &m_samples, &Samples::slotRequestSamples);
         connect(newDevice, &Device::signalConnectionLost, this, &DeviceManager::slotConnectionLost);
+        connect(newDevice, &Device::signalNewOffsetMeasurement, m_webSocket, &WebSocket::slotSend);
 
         QJsonObject json;
         json["to"] = from;

@@ -18,7 +18,7 @@ class BasicMeasurementSeries : public MeasurementSeriesBase
     const std::vector<std::string> FilterAsString = {"everything", "lowest values", "tracking"};
 
 public:
-    BasicMeasurementSeries();
+    BasicMeasurementSeries(const std::string &logName = "");
 
     void add(int64_t rawserverTime, int64_t rawclientTime);
     void prepareNewDataMeasurement(int samples);
@@ -40,6 +40,7 @@ private:
 
     bool accept(const SampleList64 &newtime, const SampleList64 &newdiff);
 
+    std::string m_logName;
     SampleList64 m_remoteTime;
     SampleList64 m_localTime;
 

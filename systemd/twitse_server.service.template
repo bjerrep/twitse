@@ -1,12 +1,13 @@
 [Unit]
 Description=twitse server
-After=network.target
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=<git root>
-ExecStart=<git root>/build/server/server
+ExecStart=<git root>/bin/server
 Restart=on-failure
 
 [Install]

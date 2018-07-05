@@ -4,6 +4,7 @@ project(server)
 
 find_package(Qt5Core)
 find_package(Qt5Network)
+find_package(Qt5WebSockets)
 
 file(GLOB sources src/*)
 
@@ -24,5 +25,11 @@ target_link_libraries(
     util
     Qt5::Core
     Qt5::Network
+    Qt5::WebSockets
     pthread
+    )
+
+add_custom_command(
+    TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}> ${TWITSEROOT}/bin/${PROJECT_NAME}
     )

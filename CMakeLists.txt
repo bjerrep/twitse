@@ -19,6 +19,8 @@ endif()
 
 set(CMAKE_AUTOMOC ON)
 
+set(TWITSEROOT ${CMAKE_CURRENT_SOURCE_DIR})
+
 add_custom_target(README SOURCES README.md doc/TLDR.md doc/RPI.md doc/VCTCXO.md .travis.yml)
 
 add_subdirectory(control)

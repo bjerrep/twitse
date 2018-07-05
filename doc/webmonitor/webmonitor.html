@@ -1,0 +1,154 @@
+<!--
+This script is a medley over mostly SO entries. Some forgotten, some came from:
+https://github.com/svenlange/websocket/blob/master/client/client.html   - started it all
+https://stackoverflow.com/a/31985557	- reconnecting websocket
+https://stackoverflow.com/a/32768149    - color selection
+and others...
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>twitse</title>
+	<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+	<script type="text/javascript" src="smoothie.js"></script>
+
+	<style>
+		body {
+			font: 16px arial, 'sans-serif' !important;
+		}
+	</style>
+
+	<script type="text/javascript">
+		var channels = {};
+		var colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
+		var next_color = 0;
+
+		class ChannelInfo {
+			constructor(name, chart, color) {
+				this._name = name;
+				this._chart = chart;
+				this._status = "online";
+				this._color = color;
+			}
+
+			get timeseries() {
+				return this._chart;
+			}
+
+			get status() {
+				return this._status;
+			}
+
+			set status(new_status) {
+				this._status = new_status;
+			}
+
+			get color() {
+				return this._color;
+			}
+		};
+
+		function update_channel_list() {
+			var c = document.getElementById('channel_box').getContext('2d');
+			c.fillStyle = "grey";
+			c.fillRect(0, 0, 400, 150);
+			c.font = '16px Arial, sans-serif';
+
+			var x = 30;
+			var y = 30;
+			var lineheight = 20;
+
+			var keys = Object.keys(channels);
+			for (var i = 0; i < keys.length; i++) {
+				c.fillStyle = "white";
+				var key = keys[i];
+				var channel_info = channels[key];
+				c.fillText(key, x, y + (i * lineheight));
+				c.fillText(channels[key].status, x + 150, y + (i * lineheight));
+				c.fillStyle = channel_info.color;
+				c.fillText(channel_info.color, x + 250, y + (i * lineheight));
+			}
+		}
+		$(function () {
+			var ms_per_pixel = 500;
+			var width = 800;
+			var minuttes = ms_per_pixel * width / 60000.0;
+			$("#info").text("Timespan : " + minuttes.toFixed(1) + " min")
+
+			var smoothie_chart = new SmoothieChart(
+				{ millisPerPixel: 500, millisPerLine:60000, 
+				  interpolation: 'bezier', 
+				  maxValue: 100, minValue: -100,
+				  grid : { verticalSections: 10,} });
+
+			smoothie_chart.streamTo(document.getElementById("chart"));
+			update_channel_list();
+
+			var ws = null;
+			console.log(new Date().getTime());
+
+			function start() {
+
+				if (window["WebSocket"]) {
+					next_color = 0;
+					ws = new WebSocket("ws://127.0.0.1:12343/ws");
+					ws.onmessage = function (e) {
+						var obj = JSON.parse(e.data);
+						var name = obj['name'];
+						var time = obj['time'];
+						var value = obj['value'];
+						var channel_info = channels[name];
+
+						if (channel_info === undefined) {
+							var time_series = new TimeSeries();
+							var color = colors[next_color++ % 6];
+							smoothie_chart.addTimeSeries(time_series,
+								{ strokeStyle: color, lineWidth: 3 });
+							channel_info = new ChannelInfo(name, time_series, color);
+							channel_info.status = "online";
+							channels[name] = channel_info;
+						}
+
+						update_channel_list();
+						var time_series = channels[name].timeseries;
+						time_series.append(parseInt(time), parseFloat(value));
+					};
+					ws.onclose = function (e) {
+						channels = {};
+						update_channel_list();
+						check();
+					};
+				} else {
+					$("#error").text("WebSocket init failed")
+				}
+			}
+
+			function check() {
+				if (!ws || ws.readyState === WebSocket.CLOSED) 
+				{
+					start();
+					update_channel_list();
+				}
+			}
+
+			start();
+
+			setInterval(check, 5000);
+		});
+
+	</script>
+</head>
+
+<body>
+	<h1>twitse</h1>
+	<div id="info"></div>
+	<canvas id="chart" width="800" height="300"></canvas>
+	<h3>Device list:</h3>
+	<canvas id="channel_box" width="400" height="150"></canvas>
+	<div id="error"></div>
+</body>
+
+</html>

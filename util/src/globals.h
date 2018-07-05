@@ -15,7 +15,7 @@ const int g_serverPingTimeout = 6000;
 const int g_clientPingPeriod = 5000;
 const int g_clientPingTimeout = 6000;
 
-const int g_clientReconnectPeriod = 1000;
+const int g_clientReconnectPeriod = 3000;
 
 const int g_statusReport = 120000;
 
@@ -27,7 +27,9 @@ const int g_maxMeasurementPeriod_sec = 30;
 static const int TIMEROFF = -1;
 
 static const int64_t NS_IN_SEC = 1000000000LL;
+static const int64_t NS_IN_MSEC = 1000000LL;
 static constexpr double NS_IN_SEC_F = 1000000000.0;
+static constexpr double NS_IN_MSEC_F = 1000000.0;
 
 enum DevelopmentMask
 {

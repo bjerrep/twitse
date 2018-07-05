@@ -23,7 +23,7 @@ public:
         uint64_t sec = ts.tv_sec;
         uint64_t nsec = ts.tv_nsec;
 
-        return sec * NS_IN_SEC + nsec + m_rawOffset;
+        return sec * NS_IN_SEC + nsec + m_monotonicClockOffset;
     }
 
     int64_t INLINE getUpdatedSystemTime(int64_t adjustment_ns = 0)
@@ -61,7 +61,7 @@ private:
     bool m_server;
     uint16_t m_dac = 0;
     int64_t m_resetTime = 0;
-    // set on the client by the server to get rid of any large and static offset that
-    // makes it awfull to look at the timing values.
-    int64_t m_rawOffset = 0;
+    // Added at startup as a constant difference between wall clock and the unpredictable CLOCK_MONOTONIC_RAW.
+    // In case the wall clock is sane this will yield sane epoch measurements to look at when developing.
+    int64_t m_monotonicClockOffset = 0;
 };

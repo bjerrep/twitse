@@ -7,6 +7,7 @@
 #include <deque>
 
 class Device;
+class WebSocket;
 
 using DeviceDeque = QVector<Device*>;
 
@@ -37,5 +38,6 @@ private:
     Samples m_samples;
     bool m_multicastTime = false;
     QVector<QString> m_activeClients;
+    WebSocket* m_webSocket;
 };
 

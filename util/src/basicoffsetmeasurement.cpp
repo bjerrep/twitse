@@ -15,9 +15,10 @@
 
 extern DevelopmentMask g_developmentMask;
 
-BasicMeasurementSeries::BasicMeasurementSeries()
+BasicMeasurementSeries::BasicMeasurementSeries(const std::string& logName)
+    : m_logName(logName)
 {
-    trace->info("sample filtering algorithm is '{}'", FilterAsString[m_filterType]);
+    trace->info("{}sample filtering algorithm is '{}'", m_logName, FilterAsString[m_filterType]);
 }
 
 
@@ -44,18 +45,18 @@ bool BasicMeasurementSeries::accept(const SampleList64& newtime,
     double lost_pct = m_samples ? 100.0 - 100.0 * m_localTime.size() / m_samples : 0.0;
     if (lost_pct > 50.0)
     {
-        trace->debug("package loss is {:.1f}%, bailing out", lost_pct);
+        trace->debug("{}package loss is {:.1f}%, bailing out", m_logName, lost_pct);
         return false;
     }
     if (lost_pct > 10.0)
     {
-        trace->warn("package loss is {:.1f}%", lost_pct);
+        trace->warn("{}package loss is {:.1f}%", m_logName, lost_pct);
     }
 
     double removed_pct = (100.0 * (m_localTime.size() - newdiff.size())) / m_localTime.size();
     if (removed_pct > 80.0)
     {
-        trace->warn("filtered out {:.1f}% samples, bailing out", removed_pct);
+        trace->warn("{}filtered out {:.1f}% samples, bailing out", m_logName, removed_pct);
         if (g_developmentMask & DevelopmentMask::OnBailingOut)
         {
             DataFiles::dumpVectors("in", m_nofSeries, &m_localTime, &newdiff);
@@ -65,7 +66,7 @@ bool BasicMeasurementSeries::accept(const SampleList64& newtime,
     }
     if (removed_pct > 50.0)
     {
-        trace->warn("filtered out {:.1f}% samples", removed_pct);
+        trace->warn("{}filtered out {:.1f}% samples", m_logName, removed_pct);
     }
 
     return true;
@@ -79,7 +80,7 @@ bool BasicMeasurementSeries::filterMeasurements(const SampleList64& diff,
 {
     if (!m_localTime.size())
     {
-        trace->error("fatal error in filterMeasurements: no data recieved");
+        trace->error("{}fatal error in filterMeasurements: no data recieved", m_logName);
         return false;
     }
 
@@ -105,7 +106,7 @@ bool BasicMeasurementSeries::filterMeasurementsAroundVector(
 {
     if (!track.size())
     {
-        trace->error("fatal error in filterMeasurements: no data recieved");
+        trace->error("{}fatal error in filterMeasurements: no data recieved", m_logName);
         return false;
     }
 

@@ -88,10 +88,12 @@ private:
     void clientDisconnected();
     void timerEvent(QTimerEvent *event);
     void sampleRunComplete();
+    std::string getLogName() const;
 
 signals:
     void signalRequestSamples(QString name, int, int);
     void signalConnectionLost(QString name);
+    void signalNewOffsetMeasurement(const QString&, double);
 
 private slots:
     void slotTcpRx();

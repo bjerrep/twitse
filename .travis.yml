@@ -12,6 +12,7 @@ before_install:
 install:
   - sudo apt-get install -qq g++-6
   - sudo apt-get --yes install qt59-meta-minimal
+  - sudo apt-get --yes install qt59websockets
   - if [ "$CXX" = "g++" ]; then export CXX="g++-6" CC="gcc-6"; fi
   - sudo apt-get install libi2c-dev
 

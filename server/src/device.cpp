@@ -18,6 +18,7 @@
 
 extern DevelopmentMask g_developmentMask;
 
+
 Device::Device(QObject* parent, const QString& clientName, const QHostAddress& address)
     : QObject(parent),
       m_name(clientName),
@@ -28,19 +29,19 @@ Device::Device(QObject* parent, const QString& clientName, const QHostAddress& a
     m_offsetMeasurementHistory = new OffsetMeasurementHistory;
     if (!m_server->listen())
     {
-        trace->critical("unable to start device server");
+        trace->critical("{}unable to start device server", getLogName());
         return;
     }
 
-    m_measurementSeries = new BasicMeasurementSeries();
+    m_measurementSeries = new BasicMeasurementSeries(getLogName());
     m_serverAddress = Interface::getLocalAddress().toString();
     m_clientUdpPort = m_server->serverPort();
-    trace->info("{} bind udp to local {}:{}", name(), m_serverAddress.toStdString(), m_clientUdpPort);
+    trace->info("{}bind udp to local {}:{}", getLogName(), m_serverAddress.toStdString(), m_clientUdpPort);
     m_udp->bind(QHostAddress(m_serverAddress), m_clientUdpPort);
     connect(m_udp, SIGNAL(readyRead()), this, SLOT(slotUdpRx()));
 
-    trace->info("{} started tcp server on {}:{}",
-                name(),
+    trace->info("{}started tcp server on {}:{}",
+                getLogName(),
                 m_serverAddress.toStdString(),
                 m_server->serverPort());
 
@@ -92,7 +93,7 @@ void Device::processMeasurement(const RxPacket& rx)
                                   measurement.m_collectedSamples,
                                   measurement.m_usedSamples);
 
-    trace->debug("{} {}", name(), measurement.toString());
+    trace->debug("{}{}", getLogName(), measurement.toString());
 
     int64_t server2client_ns = rx.value("offset").toLongLong();
     double client_us = server2client_ns / 1000.0;
@@ -108,9 +109,9 @@ void Device::processMeasurement(const RxPacket& rx)
 
     bool valid = true;
 
-    if (!(g_developmentMask & DevelopmentMask::SameHost) and (roundtrip_ms < 1.0 or roundtrip_ms > 5.0))
+    if (!(g_developmentMask & DevelopmentMask::SameHost) and (roundtrip_ms < 0.7 or roundtrip_ms > 5.0))
     {
-        trace->critical("either system times are invalid or network is useless, roundtrip is {:.3f} msecs. Aborting", roundtrip_ms);
+        trace->critical("{}either system times are invalid or network is useless, roundtrip is {:.3f} msecs. Aborting", getLogName(), roundtrip_ms);
         valid = false;
     }
 
@@ -118,7 +119,7 @@ void Device::processMeasurement(const RxPacket& rx)
     {
         if (roundtrip_us / m_avgRoundtrip_us > 2.0)
         {
-            trace->critical("roundtrip jumped from average {:.3f} to {:.3f} msecs. Aborting", m_avgRoundtrip_us/1000.0, roundtrip_ms);
+            trace->critical("{}roundtrip jumped from average {:.3f} to {:.3f} msecs. Aborting", m_avgRoundtrip_us/1000.0, getLogName(), roundtrip_ms);
             valid = false;
         }
     }
@@ -177,8 +178,8 @@ void Device::processMeasurement(const RxPacket& rx)
             ppm /= magicnumber_lock_throttle;
         }
 
-        trace->debug("{} adjusting ppm {:7.3f} (offset {:7.3f} levelling {:7.3f})",
-                     name(), ppm, offset_ppm, levelling_ppm);
+        trace->debug("{}adjusting ppm {:7.3f} (offset {:7.3f} levelling {:7.3f})",
+                     getLogName(), ppm, offset_ppm, levelling_ppm);
 
         double ppmLimit = 0.2;
         if (m_lock.isLock())
@@ -189,7 +190,7 @@ void Device::processMeasurement(const RxPacket& rx)
         if (std::fabs(ppm) > ppmLimit)
         {
             double newppm = ppm >= ppmLimit ? ppmLimit : -ppmLimit;
-            trace->warn("large ppm adjustment value {} truncated to {}", ppm, newppm);
+            trace->warn("{}large ppm adjustment value {} truncated to {}", getLogName(), ppm, newppm);
             ppm = newppm;
         }
 
@@ -202,10 +203,10 @@ void Device::processMeasurement(const RxPacket& rx)
     m_prev = clientoffset_us;
 
     std::string message = fmt::format(
-                WHITE "{} {:-3d} runtime {:5.1f} roundtrip_us {:5.1f} "
+                WHITE "{}{:-3d} runtime {:5.1f} roundtrip_us {:5.1f} "
                       "sd_us {:5.1f} period_sec {:2} silence_sec {:2} samples {:4} avgoffs_us {:5.1f} "
                       "offset_us " YELLOW "{:5.1f}" RESET,
-                name(), m_offsetMeasurementHistory->getCounter(), s_systemTime->getRunningTime_secs(),
+                getLogName(), m_offsetMeasurementHistory->getCounter(), s_systemTime->getRunningTime_secs(),
                 roundtrip_us,
                 m_offsetMeasurementHistory->getSD_us(),
                 m_lock.getMeasurementPeriodsecs(), m_lock.getInterMeasurementDelaySecs(), m_lock.getNofSamples(),
@@ -220,8 +221,8 @@ void Device::processMeasurement(const RxPacket& rx)
         DataFiles::fileApp(filename, message);
     }
 
-    trace->debug("{} cli2ser_us {:7.3f} ser2cli_us {:7.3f} spacing_sec {}",
-                 name(), local_us, client_us, m_lock.getInterMeasurementDelaySecs());
+    trace->debug("{}cli2ser_us {:7.3f} ser2cli_us {:7.3f} spacing_sec {}",
+                 getLogName(), local_us, client_us, m_lock.getInterMeasurementDelaySecs());
 
     if (m_udpOverruns > 10)
     {
@@ -232,12 +233,6 @@ void Device::processMeasurement(const RxPacket& rx)
     if (m_clockAdjust > 0 && --m_clockAdjust == 0)
     {
         int64_t client_adjustment_ns = (int64_t) client2server_ns - roundtrip_ns / 2;
-
-#ifdef VCTCXO
-        int64_t localRawToWallOffset = s_systemTime->getWallClock() - s_systemTime->getRawSystemTime();
-        s_systemTime->adjustSystemTime(localRawToWallOffset);
-        client_adjustment_ns += localRawToWallOffset;
-#endif
 
         m_averagesInitialized = false;
         m_ppmActive = true;
@@ -252,7 +247,7 @@ void Device::processMeasurement(const RxPacket& rx)
         json["set_ppm"] = QString::number(-ppm);
         tcpTx(json);
 
-        trace->info("{} adjusting client system time with {} ns and setting ppm to {:7.3f}", name(), client_adjustment_ns, ppm);
+        trace->info("{}adjusting client system time with {} ns and setting ppm to {:7.3f}", getLogName(), client_adjustment_ns, ppm);
 
         m_offsetMeasurementHistory->enableAverages();
     }
@@ -260,7 +255,10 @@ void Device::processMeasurement(const RxPacket& rx)
     {
         sampleRunComplete();
     }
+
+    emit signalNewOffsetMeasurement(m_name, clientoffset_us);
 }
+
 
 void Device::timerEvent(QTimerEvent* event)
 {
@@ -302,25 +300,27 @@ void Device::tcpTx(const QJsonObject& json)
 
     if (!m_tcpSocket)
     {
-        trace->error("cant write to socket with no client");
+        trace->error("{}cant write to socket with no client", getLogName());
         return;
     }
 
     TcpTxPacket tx(json);
 
+    // segfault seen here (during debugging). dunno how to avoid that.
     if (!m_tcpSocket->isWritable())
     {
-        trace->warn("tcp socket not writable?");
+        trace->warn("{}tcp socket not writable?", getLogName());
         clientDisconnected();
         return;
     }
 
     if (m_tcpSocket->state() != QAbstractSocket::ConnectedState)
     {
-        trace->warn("tcp socket not in connected state ? ({})", m_tcpSocket->state());
+        trace->warn("{}tcp socket not in connected state ? ({})", getLogName(), m_tcpSocket->state());
         clientDisconnected();
         return;
     }
+
     m_tcpSocket->write(tx.getData());
     m_statusReport.packetSentOrReceived();
 
@@ -354,7 +354,7 @@ void Device::slotTcpRx()
         uint16_t length = *(uint16_t*) m_tcpReadBuffer.constData();
         if (m_tcpReadBuffer.size() < length + 2)
         {
-            trace->debug("got partial {} bytes", m_tcpReadBuffer.size());
+            trace->debug("{}got partial {} bytes", getLogName(), m_tcpReadBuffer.size());
             return;
         }
 
@@ -389,7 +389,7 @@ void Device::slotTcpRx()
             bool clientValid = rx.value("valid") == "true";
             if (!clientValid)
             {
-                trace->warn("client measurement is invalid, retrying..");
+                trace->warn("{}client measurement is invalid, retrying..", getLogName());
                 m_lock.panic();
                 sampleRunComplete();
             }
@@ -457,8 +457,8 @@ void Device::prepareSampleRun()
     json["samples"] = QString::number(count);
     tcpTx(json);
 
-    trace->debug("{} starting sample run with {} samples and period_ms {} (slept {} secs)",
-                 name(), count, m_lock.getPeriodMSecs(), m_lock.getInterMeasurementDelaySecs());
+    trace->debug("{}starting sample run with {} samples and period_ms {} (slept {} secs)",
+                 getLogName(), count, m_lock.getPeriodMSecs(), m_lock.getInterMeasurementDelaySecs());
     emit signalRequestSamples(m_name, count, m_lock.getPeriodMSecs());
 }
 
@@ -467,6 +467,12 @@ void Device::sampleRunComplete()
 {
     m_measurementSeries->prepareNewDataMeasurement(m_lock.getNofSamples());
     tcpTx("sampleruncomplete");
+}
+
+
+std::string Device::getLogName() const
+{
+    return fmt::format("[{}] ", m_name.toStdString());
 }
 
 
@@ -484,8 +490,8 @@ void Device::slotClientConnected()
     m_clientAddress = QHostAddress(m_tcpSocket->peerAddress().toIPv4Address());
     m_clientTcpPort = m_tcpSocket->peerPort();
 
-    trace->info(IMPORTANT "client '{}' connected from {}:{}" RESET,
-                name(), m_clientAddress.toString().toStdString(), m_clientTcpPort);
+    trace->info(IMPORTANT "{}connected from {}:{}" RESET,
+                getLogName(), m_clientAddress.toString().toStdString(), m_clientTcpPort);
 
     connect(m_tcpSocket, &QTcpSocket::readyRead, this, &Device::slotTcpRx);
 

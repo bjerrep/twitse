@@ -44,6 +44,14 @@ public:
         return systime + offset;
     }
 
+    int64_t getWallClock()
+    {
+        struct timespec ts = {0};
+        clock_gettime(CLOCK_REALTIME, &ts);
+        uint64_t sec = ts.tv_sec;
+        uint64_t nsec = ts.tv_nsec;
+        return sec * NS_IN_SEC + nsec;
+    }
 
     void adjustSystemTime(int64_t adjustment_ns);
 

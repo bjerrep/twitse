@@ -27,6 +27,11 @@ Server::Server(QCoreApplication *parent, QString id, const QHostAddress &address
 {
     s_systemTime = new SystemTime(true);
 
+#ifdef VCTCXO
+    int64_t localRawToWallOffset = s_systemTime->getWallClock() - s_systemTime->getRawSystemTime();
+    s_systemTime->adjustSystemTime(localRawToWallOffset);
+#endif
+
     m_multicastThread = new QThread(parent);
     m_multicast = new Multicast("no1", address, port);
 
@@ -72,6 +77,7 @@ void Server::multicastRx(MulticastRxPacketPtr rx)
         m_deviceManager.process(rx);
     }
 }
+
 
 void Server::executeControl(MulticastRxPacketPtr rx)
 {

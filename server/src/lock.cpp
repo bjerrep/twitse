@@ -151,7 +151,7 @@ Lock::LockState Lock::errorOffset(double offset)
 
     if (lockState != m_lockState)
     {
-        trace->info("{} lock status changed from {} to {}", m_clientName, toString(lockState), toString(m_lockState));
+        trace->info("[{}] lock status changed from {} to {}", m_clientName, toString(lockState), toString(m_lockState));
     }
     return m_lockState;
 }
@@ -165,7 +165,7 @@ void Lock::panic()
     }
     if (m_lockState >= LOCKED)
     {
-        trace->info("{} lock status changed from {} to {}", m_clientName, toString(m_lockState), toString(LOCKED));
+        trace->info("[{}] lock status changed from {} to {}", m_clientName, toString(m_lockState), toString(LOCKED));
         m_lockState = LOCKED;
     }
 }
