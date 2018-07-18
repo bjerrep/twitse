@@ -62,6 +62,8 @@ void DeviceManager::process(const MulticastRxPacketPtr rx)
         connect(newDevice, &Device::signalRequestSamples, &m_samples, &Samples::slotRequestSamples);
         connect(newDevice, &Device::signalConnectionLost, this, &DeviceManager::slotConnectionLost);
         connect(newDevice, &Device::signalNewOffsetMeasurement, m_webSocket, &WebSocket::slotSend);
+        connect(newDevice, &Device::signalWebsocketTransmit, m_webSocket, &WebSocket::slotTransmit);
+        connect(m_webSocket, &WebSocket::signalNewWebsocketConnection, this, &DeviceManager::slotNewWebsocketConnection);
 
         QJsonObject json;
         json["to"] = from;
@@ -128,4 +130,19 @@ void DeviceManager::slotConnectionLost(const QString& client)
     }
 
     trace->error("got connection lost on unknown client '{}'", client.toStdString());
+}
+
+
+void DeviceManager::slotNewWebsocketConnection()
+{
+    for(auto device : m_deviceDeque)
+    {
+        device->slotSendStatus();
+    }
+}
+
+
+void DeviceManager::slotWebsocketTransmit(const QJsonObject &json)
+{
+    m_webSocket->slotTransmit(json);
 }

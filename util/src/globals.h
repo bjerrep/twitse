@@ -38,7 +38,8 @@ enum DevelopmentMask
     OnBailingOut                = 0x02,
     AnalysisAppendToSummary     = 0x04,
     SaveMeasurements            = 0x08,
-    SaveClientSummaryLines      = 0x10
+    SaveClientSummaryLines      = 0x10,
+    TurboMeasurements           = 0x20
 };
 
 // #define TRACE_TCP_COMMANDS

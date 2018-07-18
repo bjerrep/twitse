@@ -1,6 +1,7 @@
 #include "lock.h"
 #include "log.h"
 
+extern DevelopmentMask g_developmentMask;
 extern int g_clientPeriod;
 extern int g_clientSamples;
 
@@ -9,6 +10,10 @@ Lock::Lock(const std::string &clientname)
 {
     m_clientName = clientname;
     trace->info("sample distribution is '{}'", m_distribution == BURST_SILENCE ? "burst/silence": "evenly distribution");
+    if (g_developmentMask & DevelopmentMask::TurboMeasurements)
+    {
+        m_maxSamples /= 5;
+    }
 }
 
 
@@ -21,6 +26,12 @@ bool Lock::isHiLock() const
 bool Lock::isLock() const
 {
     return m_lockState != UNLOCKED;
+}
+
+
+Lock::LockState Lock::getLockState() const
+{
+    return m_lockState;
 }
 
 
@@ -54,7 +65,7 @@ int Lock::getPeriodMSecs() const
 
 int Lock::getMeasurementPeriodsecs() const
 {
-    const int min_period = (g_maxNofSamples * g_minSampleInterval_ms) / 1000;
+    const int min_period = (m_maxSamples * g_minSampleInterval_ms) / 1000;
 
     if (g_clientPeriod >= 0)
         return g_clientPeriod + min_period;
@@ -78,9 +89,21 @@ int Lock::getNofSamples() const
     if (g_clientSamples >= 0)
         return g_clientSamples;
 
-    const int factor = (g_maxNofSamples - g_minNofSamples) / MAX_QUALITY;
-    int samples = g_maxNofSamples - m_quality * factor;
+    const int factor = (m_maxSamples - g_minNofSamples) / MAX_QUALITY;
+    int samples = m_maxSamples - m_quality * factor;
     return samples;
+}
+
+
+std::string Lock::toColorString(LockState state)
+{
+    switch (state)
+    {
+    case UNLOCKED : return RED "unlocked" RESET;
+    case LOCKED : return DARKGREEN "locked" RESET;
+    case HILOCK : return GREEN "high lock" RESET;
+    }
+    return "";
 }
 
 
@@ -88,9 +111,9 @@ std::string Lock::toString(LockState state)
 {
     switch (state)
     {
-    case UNLOCKED : return RED "unlocked" RESET;
-    case LOCKED : return DARKGREEN "locked" RESET;
-    case HILOCK : return GREEN "high lock" RESET;
+    case UNLOCKED : return "unlocked";
+    case LOCKED : return "locked";
+    case HILOCK : return "high lock";
     }
     return "";
 }
@@ -151,7 +174,8 @@ Lock::LockState Lock::errorOffset(double offset)
 
     if (lockState != m_lockState)
     {
-        trace->info("[{}] lock status changed from {} to {}", m_clientName, toString(lockState), toString(m_lockState));
+        trace->info("[{}] lock status changed from {} to {}", m_clientName, toColorString(lockState), toColorString(m_lockState));
+        emit signalNewLockState(m_lockState);
     }
     return m_lockState;
 }
@@ -165,7 +189,7 @@ void Lock::panic()
     }
     if (m_lockState >= LOCKED)
     {
-        trace->info("[{}] lock status changed from {} to {}", m_clientName, toString(m_lockState), toString(LOCKED));
+        trace->info("[{}] lock status changed from {} to {}", m_clientName, toColorString(m_lockState), toColorString(LOCKED));
         m_lockState = LOCKED;
     }
 }

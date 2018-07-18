@@ -16,6 +16,7 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 
+
 extern DevelopmentMask g_developmentMask;
 
 
@@ -50,6 +51,8 @@ Device::Device(QObject* parent, const QString& clientName, const QHostAddress& a
     m_clientActiveTimer = startTimer(g_clientPingTimeout);
     m_clientPingTimer = startTimer(500);
     m_clientPingCounter = g_serverPingPeriod / 500;
+
+    connect(&m_lock, &Lock::signalNewLockState, this, &Device::slotNewLockState);
 }
 
 
@@ -150,8 +153,8 @@ void Device::processMeasurement(const RxPacket& rx)
     {
         // experimental constants.
 #ifdef VCTCXO
-        double magicnumber_zero = 400;
-        double magicnumber_antislope = 15;
+        double magicnumber_zero = 300;
+        double magicnumber_antislope = 7;
         double magicnumber_hilock_throttle = 1.0;
         double magicnumber_lock_throttle = 1.0;
 #else
@@ -257,6 +260,12 @@ void Device::processMeasurement(const RxPacket& rx)
     }
 
     emit signalNewOffsetMeasurement(m_name, clientoffset_us);
+
+    QJsonObject json;
+    json["name"] = m_name;
+    json["command"] = "connection_info";
+    json["loss"] = QString::number(measurement.packageLossPct());
+    emit signalWebsocketTransmit(json);
 }
 
 
@@ -434,6 +443,16 @@ void Device::slotUdpRx()
 }
 
 
+void Device::slotNewLockState(Lock::LockState lockState)
+{
+    QJsonObject json;
+    json["name"] = m_name;
+    json["command"] = "lockstateupdate";
+    json["lockstate"] = Lock::toString(lockState).c_str();
+    emit signalWebsocketTransmit(json);
+}
+
+
 void Device::getClientOffset()
 {
     tcpTx("sendforwardoffset");
@@ -479,6 +498,12 @@ std::string Device::getLogName() const
 std::string Device::name() const
 {
     return m_name.toStdString();
+}
+
+
+void Device::slotSendStatus()
+{
+    slotNewLockState(m_lock.getLockState());
 }
 
 

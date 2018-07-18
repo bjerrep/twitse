@@ -31,6 +31,8 @@ public slots:
     void slotSendTimeSample(const QString &client);
     void slotSampleRunStatusUpdate(QString client, bool active);
     void slotConnectionLost(const QString &client);
+    void slotWebsocketTransmit(const QJsonObject& json);
+    void slotNewWebsocketConnection();
 
 private:
     DeviceManager(const DeviceManager&);

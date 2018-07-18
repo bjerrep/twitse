@@ -223,7 +223,7 @@ OffsetMeasurement BasicMeasurementSeries::calculate()
     }
 
     OffsetMeasurement offsetMeasurement(m_nofSeries, m_localTime.front(), m_localTime.back(),
-                                        samples, filtered_time.size(),
+                                        m_nofMeasurements, samples, filtered_time.size(),
                                         average_offset_ns, success);
 
     return offsetMeasurement;

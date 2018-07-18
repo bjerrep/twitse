@@ -40,7 +40,8 @@ int main(int argc, char *argv[])
     parser.addOptions({
                           {"port", "multicast port", "port"},
                           {"loglevel", "0:error 1:info(default) 2:debug 3:all", "loglevel"},
-                          {"samehost", "both server and client runs on the same host, accept unexpected measurements"}
+                          {"samehost", "both server and client runs on the same host, accept unexpected measurements"},
+                          {"turbo", "a development speedup mode with fast (and poor) measurements"}
                       });
     parser.process(app);
 
@@ -66,6 +67,13 @@ int main(int argc, char *argv[])
     if (parser.isSet("samehost"))
     {
         g_developmentMask = (DevelopmentMask) (g_developmentMask | DevelopmentMask::SameHost);
+        trace->warn("samehost mode enabled");
+    }
+
+    if (parser.isSet("turbo"))
+    {
+        g_developmentMask = (DevelopmentMask) (g_developmentMask | DevelopmentMask::TurboMeasurements);
+        trace->warn("turbo mode enabled");
     }
 
 #ifdef VCTCXO

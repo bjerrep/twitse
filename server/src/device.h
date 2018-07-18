@@ -5,12 +5,14 @@
 #include "lock.h"
 #include "log.h"
 #include "rxpacket.h"
+#include "lock.h"
 
 #include <QString>
 #include <QIODevice>
 #include <QDataStream>
 #include <QByteArray>
 #include <QHostAddress>
+#include <QJsonObject>
 
 class OffsetMeasurementHistory;
 class MeasurementSeriesBase;
@@ -94,11 +96,16 @@ signals:
     void signalRequestSamples(QString name, int, int);
     void signalConnectionLost(QString name);
     void signalNewOffsetMeasurement(const QString&, double);
+    void signalWebsocketTransmit(const QJsonObject& json);
+
+public slots:
+    void slotSendStatus();
 
 private slots:
     void slotTcpRx();
     void slotClientConnected();
     void slotUdpRx();
+    void slotNewLockState(Lock::LockState m_lockState);
 
 public:
     QString m_name;

@@ -4,6 +4,7 @@
 #include "systemtime.h"
 
 #include <QJsonDocument>
+#include <QCoreApplication>
 #include <QtWebSockets/QWebSocket>
 
 
@@ -77,17 +78,37 @@ void WebSocket::slotNewConnection()
                 socket->peerAddress().toString().toStdString(),
                 socket->peerPort());
 
-    for (auto measurement : m_webSocketHistory)
-    {
-        QJsonDocument doc(*measurement);
-        m_clients[0]->sendTextMessage(doc.toJson());
-    }
+    emit signalNewWebsocketConnection();
 }
 
 
 void WebSocket::slotTextMessageReceived(const QString& message)
 {
-    trace->info("message : {}", message.toStdString());
+    trace->debug("message : {}", message.toStdString());
+    QJsonObject json = QJsonDocument::fromJson(message.toUtf8()).object();
+    QString command = json.value("command").toString();
+
+    if (command == "get_history")
+    {
+        for (auto measurement : m_webSocketHistory)
+        {
+            QJsonDocument doc(*measurement);
+            m_clients.last()->sendTextMessage(doc.toJson());
+        }
+    }
+    else if (command == "transient_test")
+    {
+        s_systemTime->adjustSystemTime(50000);
+    }
+    else if (command == "server_restart")
+    {
+        QCoreApplication::quit();
+    }
+
+    else
+    {
+        trace->warn("unknown command: '{}'", command.toStdString());
+    }
 }
 
 
@@ -105,3 +126,13 @@ void WebSocket::slotDisconnected()
         }
     }
 }
+
+
+void WebSocket::slotTransmit(const QJsonObject &json)
+{
+    if (!m_clients.size())
+        return;
+    QJsonDocument doc(json);
+    m_clients.last()->sendTextMessage(doc.toJson());
+}
+

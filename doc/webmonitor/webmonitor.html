@@ -10,145 +10,202 @@ and others...
 <html>
 
 <head>
-	<meta charset="utf-8" />
-	<title>twitse</title>
-	<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
-	<script type="text/javascript" src="smoothie.js"></script>
+    <meta charset="utf-8" />
+    <title>twitse</title>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+    <script type="text/javascript" src="smoothie.js"></script>
+    <script type="text/javascript" src="findservers.js"></script>
 
-	<style>
-		body {
-			font: 16px arial, 'sans-serif' !important;
-		}
-	</style>
+    <style>
+        body {
+            font: 16px arial, 'sans-serif' !important;
+        }
+    </style>
 
-	<script type="text/javascript">
-		var channels = {};
-		var colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
-		var next_color = 0;
+    <script type="text/javascript">
+        var channels = {};
+        var colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
+        var next_color = 0;
+        var graph_width = 800;
+        var ws = null;
 
-		class ChannelInfo {
-			constructor(name, chart, color) {
-				this._name = name;
-				this._chart = chart;
-				this._status = "online";
-				this._color = color;
-			}
+        class ChannelInfo {
+            constructor(name, chart, color) {
+                this._name = name;
+                this._chart = chart;
+                this._status = "online";
+                this._color = color;
+                this._lockstate = "unknown";
+                this._loss = 0.0;
+            }
 
-			get timeseries() {
-				return this._chart;
-			}
+            get timeseries() { return this._chart; }
+            get status() { return this._status; }
+            set status(new_status) { this._status = new_status; }
+            get color() { return this._color; }
+            set lockstate(new_lockstate) { this._lockstate = new_lockstate; }
+            get lockstate() { return this._lockstate; }
+            set loss(new_loss) { this._loss = new_loss; }
+            get loss() { return this._loss; }
+        };
 
-			get status() {
-				return this._status;
-			}
+        function update_channel_list() {
+            var c = document.getElementById('channel_box').getContext('2d');
+            c.fillStyle = "grey";
+            c.fillRect(0, 0, 400, 150);
+            c.font = '16px Arial, sans-serif';
 
-			set status(new_status) {
-				this._status = new_status;
-			}
+            var x = 30;
+            var y = 30;
+            var lineheight = 20;
 
-			get color() {
-				return this._color;
-			}
-		};
+            var keys = Object.keys(channels);
+            for (var i = 0; i < keys.length; i++) {
+                c.fillStyle = "white";
+                var key = keys[i];
+                var channel_info = channels[key];
+                c.fillText(key, x, y + (i * lineheight));
+                c.fillText(channel_info.status, x + 90, y + (i * lineheight));
+                c.fillText(channel_info.lockstate, x + 160, y + (i * lineheight));
+                c.fillText(parseFloat(channel_info.loss).toFixed(1), x + 250, y + (i * lineheight));
+                c.fillStyle = channel_info.color;
+                c.fillText(channel_info.color, x + 300, y + (i * lineheight));
+            }
+        }
+        
+        function server_info(url)
+        {
+            if (!url) $("#error").text("Server: Searching...");
+            else $("#error").text("Server: " + url);
+        }
+            
+        
+        $(function () {
+            var ms_per_pixel = 800;
+            var minuttes = ms_per_pixel * graph_width / 60000.0;
+            $("#info").text("Timespan : " + minuttes.toFixed(1) + " min")
 
-		function update_channel_list() {
-			var c = document.getElementById('channel_box').getContext('2d');
-			c.fillStyle = "grey";
-			c.fillRect(0, 0, 400, 150);
-			c.font = '16px Arial, sans-serif';
+            var smoothie_chart = new SmoothieChart(
+                { millisPerPixel: 500, millisPerLine:60000, 
+                interpolation: 'bezier', 
+                maxValue: 100, minValue: -100,
+                grid : { verticalSections: 10,} });
 
-			var x = 30;
-			var y = 30;
-			var lineheight = 20;
+            var chart = document.getElementById("chart");
+            smoothie_chart.streamTo(chart);
+            chart.style.width = graph_width + "px";
+            update_channel_list();
 
-			var keys = Object.keys(channels);
-			for (var i = 0; i < keys.length; i++) {
-				c.fillStyle = "white";
-				var key = keys[i];
-				var channel_info = channels[key];
-				c.fillText(key, x, y + (i * lineheight));
-				c.fillText(channels[key].status, x + 150, y + (i * lineheight));
-				c.fillStyle = channel_info.color;
-				c.fillText(channel_info.color, x + 250, y + (i * lineheight));
-			}
-		}
-		$(function () {
-			var ms_per_pixel = 500;
-			var width = 800;
-			var minuttes = ms_per_pixel * width / 60000.0;
-			$("#info").text("Timespan : " + minuttes.toFixed(1) + " min")
+            
+            server_info(null);
 
-			var smoothie_chart = new SmoothieChart(
-				{ millisPerPixel: 500, millisPerLine:60000, 
-				  interpolation: 'bezier', 
-				  maxValue: 100, minValue: -100,
-				  grid : { verticalSections: 10,} });
+            function start(url) {
 
-			smoothie_chart.streamTo(document.getElementById("chart"));
-			update_channel_list();
+                if (window["WebSocket"]) {
+                    next_color = 0;
+                    ws = new WebSocket(url);
+                    ws.onmessage = function (e) {
+                        var obj = JSON.parse(e.data);
+                        var name = obj['name'];
+                        var command = obj['command'];
+                        
+                        var channel_info = channels[name];
+                        
+                        if (channel_info === undefined) {
+                            var time_series = new TimeSeries();
+                            var color = colors[next_color++ % 6];
+                            smoothie_chart.addTimeSeries(time_series,
+                                { strokeStyle: color, lineWidth: 3 });
+                            channel_info = new ChannelInfo(name, time_series, color);
+                            channel_info.status = "online";
+                            channels[name] = channel_info;
+                        }
+                        
+                        if (command === "lockstateupdate") {
+                            channel_info.lockstate = obj['lockstate']
+                        }
+                        else if (command === "connection_info") {
+                            channel_info.loss = obj['loss']
+                        }
+                        else {
+                            var time = obj['time'];
+                            var value = obj['value'];
+                            
+                            var time_series = channel_info.timeseries;
+                            time_series.append(parseInt(time), parseFloat(value));
+                        }
+                        update_channel_list();
+                    };
+                    ws.onclose = function (e) {
+                        server_info(null);
+                        channels = {};
+                        update_channel_list();
+                        check();
+                    };
+                    ws.onopen = function (e) {
+                        ws.send(JSON.stringify({
+                            "command": "get_history"
+                        }));
+                    };
+                } else {
+                    $("#error").text("WebSocket init failed")
+                }
+            }
 
-			var ws = null;
-			console.log(new Date().getTime());
+            function check() {
+                if (!ws || ws.readyState === WebSocket.CLOSED) 
+                {
+                    update_channel_list();
+                    findserver(12343, "192.168.1.", 2, 255, 150, 1000, function(url)
+                    {
+                        server_info(url);
+                        start(url);
+                        console.log("found websocket");
+                    });
+                }
+            }
+            
+            check();
 
-			function start() {
+            setInterval(check, 5000);
+            
+        });
 
-				if (window["WebSocket"]) {
-					next_color = 0;
-					ws = new WebSocket("ws://127.0.0.1:12343/ws");
-					ws.onmessage = function (e) {
-						var obj = JSON.parse(e.data);
-						var name = obj['name'];
-						var time = obj['time'];
-						var value = obj['value'];
-						var channel_info = channels[name];
+        function CommandTransientTest() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    "command": "transient_test"
+                }));
+            }
+        };
 
-						if (channel_info === undefined) {
-							var time_series = new TimeSeries();
-							var color = colors[next_color++ % 6];
-							smoothie_chart.addTimeSeries(time_series,
-								{ strokeStyle: color, lineWidth: 3 });
-							channel_info = new ChannelInfo(name, time_series, color);
-							channel_info.status = "online";
-							channels[name] = channel_info;
-						}
 
-						update_channel_list();
-						var time_series = channels[name].timeseries;
-						time_series.append(parseInt(time), parseFloat(value));
-					};
-					ws.onclose = function (e) {
-						channels = {};
-						update_channel_list();
-						check();
-					};
-				} else {
-					$("#error").text("WebSocket init failed")
-				}
-			}
+        $(document).ready(function() {
+            $('#button_server_restart').click(function() {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        "command": "server_restart"
+                    }));
+                }
+            });
+        });
 
-			function check() {
-				if (!ws || ws.readyState === WebSocket.CLOSED) 
-				{
-					start();
-					update_channel_list();
-				}
-			}
-
-			start();
-
-			setInterval(check, 5000);
-		});
-
-	</script>
+    </script>
 </head>
 
 <body>
-	<h1>twitse</h1>
-	<div id="info"></div>
-	<canvas id="chart" width="800" height="300"></canvas>
-	<h3>Device list:</h3>
-	<canvas id="channel_box" width="400" height="150"></canvas>
-	<div id="error"></div>
+    <h1>twitse</h1>
+    <div id="info"></div>
+    <canvas id="chart" width="800" height="300"></canvas>
+    <h3>Device list:</h3>
+    <canvas id="channel_box" width="500" height="150"></canvas>
+    <p>
+    <input type="button" value="Restart server" id="button_server_restart" >
+    <input type="button" value="50us step response" onclick="CommandTransientTest();" >
+    </p>
+    
+    <div id="server_info"></div>
+    <div id="error"></div>
 </body>
 
 </html>

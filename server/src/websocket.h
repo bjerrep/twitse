@@ -17,10 +17,14 @@ public:
 
     void slotSend(const QString& clientName, double offset_us);
 
+signals:
+    void signalNewWebsocketConnection();
+
 public slots:
     void slotNewConnection();
     void slotTextMessageReceived(const QString&);
     void slotDisconnected();
+    void slotTransmit(const QJsonObject& json);
 
 private:
     QWebSocketServer* m_webSocket;

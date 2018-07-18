@@ -3,10 +3,10 @@
 
 #include <string>
 
-OffsetMeasurement::OffsetMeasurement(int index, int64_t starttime_ns, int64_t endtime_ns,
+OffsetMeasurement::OffsetMeasurement(int index, int64_t starttime_ns, int64_t endtime_ns, int samples_sent,
                                      int samples, int used, int64_t avg_ns, bool valid)
     : m_index(index), m_starttime_ns(starttime_ns), m_endtime_ns(endtime_ns),
-      m_collectedSamples(samples), m_usedSamples(used),
+      m_sentSamples(samples_sent), m_collectedSamples(samples), m_usedSamples(used),
       m_offset_ns(avg_ns), m_valid(valid)
 {
 }
@@ -25,4 +25,11 @@ std::string OffsetMeasurement::toString() const
                        m_collectedSamples, used_samples,
                        m_offset_ns/1000.0, m_ppm,
                        m_valid ? "" : "invalid");
+}
+
+double OffsetMeasurement::packageLossPct() const
+{
+    if (!m_sentSamples)
+        return 0.0;
+    return 100.0 - 100.0 * (m_sentSamples - m_collectedSamples) / m_sentSamples;
 }
