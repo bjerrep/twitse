@@ -1,6 +1,7 @@
 #pragma once
 
 #include "spdlog/spdlog.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
 
 /*
  spdlog::level, native spdlog loglevels:
