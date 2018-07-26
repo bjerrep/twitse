@@ -9,5 +9,5 @@ build*
 bin
 
 #spdlog
-external
+external/spdlog
 .gitmodules

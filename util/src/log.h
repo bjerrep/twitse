@@ -1,7 +1,11 @@
 #pragma once
 
 #include "spdlog/spdlog.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
+
+// attempt to be compatible with both master and 1.x spdlog branches
+#ifdef synchronous_factory
+#include "spdlog/sinks/stdout_color_sinks.h" // needed when on 1.x
+#endif
 
 /*
  spdlog::level, native spdlog loglevels:
