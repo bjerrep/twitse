@@ -100,5 +100,4 @@ int main(int argc, char *argv[])
     Client client(&app, name, address, port, loglevel, no_clock_adj, !use_fixed_adjust, fixed_adjust);
 
     return app.exec();
-    trace->info("server exits");
 }

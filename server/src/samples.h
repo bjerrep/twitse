@@ -41,5 +41,5 @@ private:
     QList<ClientSampleRun*> m_sampleRuns;
     QList<ClientSampleRun*>::Iterator m_client_it = nullptr;
     int m_timerId = TIMEROFF;
-    int m_period_ms;
+    int m_period_ms = 0;
 };

@@ -7,8 +7,8 @@ extern int g_clientSamples;
 
 
 Lock::Lock(const std::string &clientname)
+    : m_clientName(clientname)
 {
-    m_clientName = clientname;
     trace->info("sample distribution is '{}'", m_distribution == BURST_SILENCE ? "burst/silence": "evenly distribution");
     if (g_developmentMask & DevelopmentMask::TurboMeasurements)
     {
