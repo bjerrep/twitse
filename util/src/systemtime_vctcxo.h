@@ -47,7 +47,7 @@ public:
         return sec * NS_IN_SEC + nsec;
     }
 
-    void adjustSystemTime(int64_t adjustment_ns);
+    void adjustSystemTime_ns(int64_t adjustment_ns);
 
     void setPPM(double ppm);
     double getPPM();

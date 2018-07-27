@@ -53,7 +53,7 @@ void WebSocket::slotSend(const QString &clientName, double offset_us)
     while (m_webSocketHistory.size())
     {
         int age = now_ms - (*m_webSocketHistory.first())["time"].toString().toLongLong();
-        const int minuttes = 10;
+        const int minuttes = 60;
         if (age > 60000 * minuttes)
         {
             m_webSocketHistory.pop_front();
@@ -98,7 +98,7 @@ void WebSocket::slotTextMessageReceived(const QString& message)
     }
     else if (command == "transient_test")
     {
-        s_systemTime->adjustSystemTime(50000);
+        s_systemTime->adjustSystemTime_ns(50000);
     }
     else if (command == "server_restart")
     {

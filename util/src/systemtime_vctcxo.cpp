@@ -8,7 +8,7 @@
 #include <sys/time.h>
 
 
-void SystemTime::adjustSystemTime(int64_t adjustment_ns)
+void SystemTime::adjustSystemTime_ns(int64_t adjustment_ns)
 {
     m_monotonicClockOffset += adjustment_ns;
     m_resetTime += adjustment_ns;

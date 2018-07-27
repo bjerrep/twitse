@@ -14,7 +14,7 @@ and others...
     <title>twitse</title>
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
     <script type="text/javascript" src="smoothie.js"></script>
-    <script type="text/javascript" src="findservers.js"></script>
+    <script type="text/javascript" src="findserver.js"></script>
 
     <style>
         body {
@@ -24,10 +24,11 @@ and others...
 
     <script type="text/javascript">
         var channels = {};
-        var colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
+        var colors = ['orange', 'yellow', 'green', 'blue', 'purple'];
+        var offsets = {}
         var next_color = 0;
-        var graph_width = 800;
         var ws = null;
+        var ms_per_pixel = 2000;
 
         class ChannelInfo {
             constructor(name, chart, color) {
@@ -51,25 +52,32 @@ and others...
 
         function update_channel_list() {
             var c = document.getElementById('channel_box').getContext('2d');
-            c.fillStyle = "grey";
-            c.fillRect(0, 0, 400, 150);
-            c.font = '16px Arial, sans-serif';
-
-            var x = 30;
-            var y = 30;
+            var x1 = 30, x2 = 90, x3 = 160, x4 = 280, x5 = 350;
+            var y0 = 30, y = 50;
             var lineheight = 20;
+            
+            c.fillStyle = "dimgrey";
+            c.fillRect(0, 0, x5 + 100, 150);
+            c.font = 'bold 14px Arial, sans-serif';
 
+            c.fillStyle = "black";
+            c.fillText("Loss %", x4, y0);
+            c.fillText("Offs us", x5, y0);
+            
             var keys = Object.keys(channels);
             for (var i = 0; i < keys.length; i++) {
-                c.fillStyle = "white";
                 var key = keys[i];
                 var channel_info = channels[key];
-                c.fillText(key, x, y + (i * lineheight));
-                c.fillText(channel_info.status, x + 90, y + (i * lineheight));
-                c.fillText(channel_info.lockstate, x + 160, y + (i * lineheight));
-                c.fillText(parseFloat(channel_info.loss).toFixed(1), x + 250, y + (i * lineheight));
-                c.fillStyle = channel_info.color;
-                c.fillText(channel_info.color, x + 300, y + (i * lineheight));
+                c.fillStyle = channel_info.color;                
+                var yoff = y + (i * lineheight);
+                c.fillText(key, x1, yoff);
+                c.fillText(channel_info.status, x2, yoff);
+                c.fillText(channel_info.lockstate, x3, yoff);
+                c.fillText(parseFloat(channel_info.loss).toFixed(1), x4, yoff);
+                var offset = offsets[key];
+                if (offset != 'undefined') {
+                    c.fillText(parseFloat(offset).toFixed(1), x5, yoff);
+                }
             }
         }
         
@@ -79,23 +87,27 @@ and others...
             else $("#error").text("Server: " + url);
         }
             
-        
-        $(function () {
-            var ms_per_pixel = 800;
+        function print_responsives() {
+            var chart = document.getElementById("chart");            
+            var graph_width = chart.clientWidth;
             var minuttes = ms_per_pixel * graph_width / 60000.0;
             $("#info").text("Timespan : " + minuttes.toFixed(1) + " min")
+        }
+        
+        $(function () {
+            print_responsives();
 
-            var smoothie_chart = new SmoothieChart(
-                { millisPerPixel: 500, millisPerLine:60000, 
-                interpolation: 'bezier', 
+            var smoothie_chart = new SmoothieChart({ 
+                responsive: true, millisPerPixel: ms_per_pixel, millisPerLine:60000,
+                interpolation: 'bezier',
                 maxValue: 100, minValue: -100,
-                grid : { verticalSections: 10,} });
+                grid: { verticalSections: 10,} 
+            });
 
-            var chart = document.getElementById("chart");
+            var chart = document.getElementById("chart");                        
             smoothie_chart.streamTo(chart);
-            chart.style.width = graph_width + "px";
-            update_channel_list();
 
+            update_channel_list();
             
             server_info(null);
 
@@ -133,6 +145,9 @@ and others...
                             
                             var time_series = channel_info.timeseries;
                             time_series.append(parseInt(time), parseFloat(value));
+                            
+                            offsets[name] = value;
+                            update_channel_list();
                         }
                         update_channel_list();
                     };
@@ -156,11 +171,16 @@ and others...
                 if (!ws || ws.readyState === WebSocket.CLOSED) 
                 {
                     update_channel_list();
-                    findserver(12343, "192.168.1.", 2, 255, 150, 1000, function(url)
+                    findserver(12343, "192.168.1.", 2, 255, 150, 3000, function(url)
                     {
-                        server_info(url);
-                        start(url);
-                        console.log("found websocket");
+                        if (url != null) {
+                            server_info(url);
+                            start(url);
+                            console.log("found websocket");
+                        }
+                        else {
+                            console.log("server not found");
+                        }
                     });
                 }
             }
@@ -179,6 +199,9 @@ and others...
             }
         };
 
+        window.addEventListener('resize', function(event){
+            print_responsives();
+        });
 
         $(document).ready(function() {
             $('#button_server_restart').click(function() {
@@ -196,7 +219,7 @@ and others...
 <body>
     <h1>twitse</h1>
     <div id="info"></div>
-    <canvas id="chart" width="800" height="300"></canvas>
+    <canvas id="chart" style="width:100%; height:200px"></canvas>
     <h3>Device list:</h3>
     <canvas id="channel_box" width="500" height="150"></canvas>
     <p>

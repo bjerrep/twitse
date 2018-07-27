@@ -16,7 +16,7 @@ void SystemTime::setSystemTime(int64_t epoch)
 }
 
 
-void SystemTime::adjustSystemTime(int64_t adjustment_ns)
+void SystemTime::adjustSystemTime_ns(int64_t adjustment_ns)
 {
     if (!s_ppmInitialized)
     {

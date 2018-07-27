@@ -315,7 +315,7 @@ void Client::tcpRx()
                     struct timespec ts = {(__time_t) (tt / SystemTimeNS_IN_SEC), (__syscall_slong_t) (tt % NS_IN_SEC)};
                     clock_settime(CLOCK_REALTIME, &ts);
 #else
-                    s_systemTime->adjustSystemTime(epoc_ns);
+                    s_systemTime->adjustSystemTime_ns(epoc_ns);
 #endif
                 }
                 else

@@ -10,7 +10,7 @@ function findserver(port, ipBase, ipLow, ipHigh, maxInFlight, timeout, cb) {
         var address = "ws://" + ipBase + ip + ":" + port;
         var socket = new WebSocket(address);
         var timer = setTimeout(function() {
-            console.log(address + " timeout");
+            //console.log(address + " timeout");
             var s = socket;
             socket = null;
             s.close();
@@ -51,9 +51,3 @@ function findserver(port, ipBase, ipLow, ipHigh, maxInFlight, timeout, cb) {
 
     next();
 }
-
-/*
-findServers(1234, "192.168.1.", 1, 255, 20, 1, 4000, function(servers) {
-    console.log(servers);
-});
-*/

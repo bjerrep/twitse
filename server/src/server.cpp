@@ -29,7 +29,7 @@ Server::Server(QCoreApplication *parent, QString id, const QHostAddress &address
 
 #ifdef VCTCXO
     int64_t localRawToWallOffset = s_systemTime->getWallClock() - s_systemTime->getRawSystemTime();
-    s_systemTime->adjustSystemTime(localRawToWallOffset);
+    s_systemTime->adjustSystemTime_ns(localRawToWallOffset);
 #endif
 
     m_multicastThread = new QThread(parent);
@@ -156,7 +156,7 @@ void Server::timerEvent(QTimerEvent* timerEvent)
 #ifdef VCTCXO
     else if (id == m_adjustToWallClockTimer)
     {
-        s_systemTime->adjustSystemTime(0);
+        s_systemTime->adjustSystemTime_ns(0);
     }
 #endif
 }

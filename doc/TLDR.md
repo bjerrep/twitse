@@ -34,6 +34,8 @@ All time testing has been on raspberry pi, with development and functional testi
 
 The entire system consisting of server and client means running root processes without anything that even remotely resembles any kind of security. At all.
 
+There are two different builds, standard build (this page) and vctcxo build. Both should build without problems but it might happen that either build actually doesn't quite work as expected if focus have been too much on the other...
+
 ## Building & deploying
 
 After the git clone add spdlog in-tree as a git submodule:
@@ -53,7 +55,7 @@ Experiment with a -j# switch if building on a rpi. (4 concurrent compilations mi
 
 A full build produces 4 binaries, server, client, control and dataanalysis.
 
-**server** : the server running on a wired pi. It can be started as is. Both server, client and control uses a common multicast socket so e.g. clients will automatically connect to a running server.
+**server** : the server running on a wired pi. It can be started as is. Both server, client and control uses a common multicast socket so e.g. clients will automatically connect to a running server. The wireless interface should be off on the server.
 
 **client** : the client running on a wireless pi. It requires a --id switch with a unique name.
 
@@ -87,13 +89,19 @@ If located in ./doc/gnuplot the demo plot can be made with gnuplot with the foll
 
 ## webmonitor
 
-A client side only webpage that connects to the server via a websocket and plots a nice graph over the current offsets. Once clients and server are running silently as services on raspberry pi computers this is page is one way to quickly figure out how the little buggers are behaving.
+A client side only webpage that connects to the server via a websocket and plots a nice graph over the current offsets. Once clients and server are running silently as services on raspberry pi computers this is page is one way to quickly figure out how the little buggers are behaving. Make sure that only the wired interface is up on the server, otherwise traffic might get routed through both wired and wireless and then nothing works.
+
+The plot shows the transient offset tracking after pressing the '50us step response' button. This adds a 50 microsecond offset to the internal time and as can be seen then there is some work left to get rid of the underdamped response.
 
 <p align="center"><img src="images/webmonitor.png"></p>
 
 Launch
 
-    webmonitor/webmonitor.html
+    index.html
     
-in a browser. Edit it to give it the correct server ip address.
+in doc/webmonitor in a browser. Edit it to give it the correct server ip address if needed, it will default scan the 192.168.1.* class C network.
+
+There is a systemd script 'twitse_webmonitor' in ./systemd intended to be running on the server that will launch a python 3 webserver on port 8000.
+
+
 
