@@ -3,7 +3,7 @@
 #include "spdlog/spdlog.h"
 
 // attempt to be compatible with both master and 1.x spdlog branches
-#ifdef synchronous_factory
+#if __has_include("spdlog/sinks/stdout_color_sinks.h")
 #include "spdlog/sinks/stdout_color_sinks.h" // needed when on 1.x
 #endif
 
