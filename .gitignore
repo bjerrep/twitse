@@ -11,3 +11,9 @@ bin
 #spdlog
 external/spdlog
 .gitmodules
+
+#devel scripts
+export.sh
+
+#editor backups
+*.kate-swp

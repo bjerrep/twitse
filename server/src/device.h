@@ -6,6 +6,7 @@
 #include "log.h"
 #include "rxpacket.h"
 #include "lock.h"
+#include "mathfunc.h"
 
 #include <QString>
 #include <QIODevice>
@@ -67,6 +68,13 @@ private:
 };
 
 
+enum InitState
+{
+    PPM_MEASUREMENTS,
+    CLIENT_CONFIGURING,
+    RUNNING
+};
+
 class Device : public QObject
 {
     Q_OBJECT
@@ -78,7 +86,7 @@ public:
     void tcpTx(const QJsonObject& json);
     void tcpTx(const QString& command);
     void sendServerTimeUDP();
-    void processTimeSample(int64_t serverTime, int64_t localTime);
+    void processTimeSample(int64_t remoteTime, int64_t localTime);
     void processMeasurement(const RxPacket &rx);
 
     std::string name() const;
@@ -116,6 +124,9 @@ public:
     int m_sampleRunTimer = TIMEROFF;
     int m_clientPingTimer = TIMEROFF;
     int m_clientPingCounter = 0;
+    int m_wallclockCounter = 0;
+    int64_t m_wallclockAverage = 0;
+    MathFifo m_wallclockFifo;
     QString m_serverAddress;
     QUdpSocket* m_udp;
     QHostAddress m_clientAddress;
@@ -126,7 +137,8 @@ public:
     OffsetMeasurementHistory* m_offsetMeasurementHistory;
     double m_avgRoundtrip_us = 0.0;
     int m_udpOverruns = 0;
-    int m_clockAdjust = 3;
+    int m_initStateCounter = 3;
+    InitState m_initState = InitState::PPM_MEASUREMENTS;
     bool m_averagesInitialized = false;
     double m_avgClientOffset = 0.0;
     bool m_ppmActive = false;

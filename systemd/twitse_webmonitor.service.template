@@ -6,6 +6,7 @@ After=network-online.target
 [Service]
 Type=simple
 User=root
+Nice=19
 WorkingDirectory=<git root>/doc/webmonitor
 # getting ip address : https://superuser.com/a/1102368
 ExecStartPre=/bin/bash -c "/bin/systemctl set-environment ip=$(/sbin/ip -o -4 addr list eth0 | awk '{print $4}' | cut -d/ -f1)"

@@ -61,7 +61,7 @@ void DeviceManager::process(const MulticastRxPacketPtr rx)
 
         connect(newDevice, &Device::signalRequestSamples, &m_samples, &Samples::slotRequestSamples);
         connect(newDevice, &Device::signalConnectionLost, this, &DeviceManager::slotConnectionLost);
-        connect(newDevice, &Device::signalNewOffsetMeasurement, m_webSocket, &WebSocket::slotSend);
+        connect(newDevice, &Device::signalNewOffsetMeasurement, m_webSocket, &WebSocket::slotSendOffsetMeasurement);
         connect(newDevice, &Device::signalWebsocketTransmit, m_webSocket, &WebSocket::slotTransmit);
         connect(m_webSocket, &WebSocket::signalNewWebsocketConnection, this, &DeviceManager::slotNewWebsocketConnection);
 

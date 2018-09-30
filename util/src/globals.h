@@ -2,6 +2,14 @@
 
 #include <stdint.h>
 
+// attempt to get rid of #ifdef'ing
+#ifdef VCTCXO
+const bool VCTCXO_MODE = true;
+#else
+const bool VCTCXO_MODE = false;
+#endif
+
+
 #define ISUSED __attribute__((__unused__))
 
 #define INLINE __attribute__((always_inline))

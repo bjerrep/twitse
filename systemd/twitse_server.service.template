@@ -1,7 +1,7 @@
 [Unit]
 Description=twitse server
-Wants=network-online.target
-After=network-online.target
+Wants=time-sync.target
+After=time-sync.target
 
 [Service]
 Type=simple

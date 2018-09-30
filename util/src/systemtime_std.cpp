@@ -46,6 +46,12 @@ double SystemTime::getRunningTime_secs()
 }
 
 
+void SystemTime::setWallclock(int64_t epoch)
+{
+    trace->critical("This is wrong. setWallclock is only implemented for VCTCXO mode");
+}
+
+
 void SystemTime::setPPM(double ppm)
 {
     s_ppm += ppm;

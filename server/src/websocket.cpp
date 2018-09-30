@@ -33,7 +33,7 @@ WebSocket::~WebSocket()
 }
 
 
-void WebSocket::slotSend(const QString &clientName, double offset_us)
+void WebSocket::slotSendOffsetMeasurement(const QString &clientName, double offset_us)
 {
     auto json = new QJsonObject;
     (*json)["name"] = clientName;

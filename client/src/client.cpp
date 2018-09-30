@@ -312,7 +312,7 @@ void Client::tcpRx()
 
 #ifdef CLIENT_USING_REALTIME
                     int64_t tt = s_systemTime->getWallClock() + epoc_ns;
-                    struct timespec ts = {(__time_t) (tt / SystemTimeNS_IN_SEC), (__syscall_slong_t) (tt % NS_IN_SEC)};
+                    struct timespec ts = {(__time_t) (tt / NS_IN_SEC), (__syscall_slong_t) (tt % NS_IN_SEC)};
                     clock_settime(CLOCK_REALTIME, &ts);
 #else
                     s_systemTime->adjustSystemTime_ns(epoc_ns);
@@ -335,6 +335,13 @@ void Client::tcpRx()
                     m_setInitialLocalPPM = false;
                 }
             }
+            if (VCTCXO_MODE)
+            {
+                int64_t wall_offset = rx.value("wall_clock").toLongLong();
+
+                s_systemTime->setWallclock(s_systemTime->getRawSystemTime() + wall_offset);
+                trace->info("adjusting wallclock to {}", s_systemTime->getWallClock());
+            }
             m_offsetMeasurementHistory.reset();
             m_offsetMeasurementHistory.enableAverages();
         }
@@ -345,6 +352,21 @@ void Client::tcpRx()
                 double ppm = rx.value("ppm_adjust").toDouble();
                 adjustPPM(ppm);
             }
+        }
+        else if (command == "serverwallclock")
+        {
+            QJsonObject json; // fixit
+            json["command"] = "clientwallclock";
+            json["serverwallclock"] = rx.value("serverwallclock");
+            json["clientwallclock"] = QString::number(s_systemTime->getWallClock());
+
+            //trace->info("got server wallclock {}, returning client wallclock {}", rx.value("serverwallclock").toStdString(), s_systemTime->getWallClock()); // fixit, remove ?
+            tcpTx(json);
+        }
+        else if (command == "adjustwallclock")
+        {
+            int64_t offset_ns = rx.value("offset_ns").toLongLong();
+            s_systemTime->setWallclock(s_systemTime->getWallClock() - offset_ns);
         }
         else
         {

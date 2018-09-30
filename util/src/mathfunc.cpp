@@ -4,6 +4,37 @@
 #include <numeric>
 
 
+MathFifo::MathFifo(size_t length)
+    : m_length(length)
+{
+}
+
+
+int64_t MathFifo::getAverage() const
+{
+    return MathFunc::average(m_fifo);
+}
+
+
+bool MathFifo::add(int64_t value)
+{
+    if (m_fifo.size() > m_length)
+    {
+        m_fifo.erase(m_fifo.begin());
+    }
+
+    m_fifo.push_back(value);
+
+    return m_fifo.size() >= m_length;
+}
+
+void MathFifo::reset()
+{
+    m_fifo.clear();
+}
+
+
+
 bool MathFunc::linearRegression(const SampleList64 &_x, const SampleList64 &_y, double &slope, double &constant)
 {
     std::vector<double> x;
@@ -29,10 +60,6 @@ bool MathFunc::linearRegression(const SampleList64 &_x, const SampleList64 &_y, 
     }
     slope = numerator / denominator;
     constant = - x[0] * slope;
-
-//    double aa = _x[0] * slope + constant;
-//    double bb = _x.back() * slope + constant;
-//    trace->info("first {}, last {}", _y[0] - aa, _y.back() - bb);
 
     return true;
 }

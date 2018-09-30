@@ -5,6 +5,20 @@
 
 using SampleList64 = std::vector<int64_t>;
 
+class MathFifo
+{
+public:
+    MathFifo(size_t length);
+    int64_t getAverage() const;
+    bool add(int64_t value);
+    void reset();
+
+private:
+    SampleList64 m_fifo;
+    size_t m_length;
+};
+
+
 class MathFunc
 {
 public:

@@ -130,7 +130,11 @@ void Server::printStatusReport()
     if (m_pendingStatusReport && !m_deviceManager.activeClients())
     {
         m_pendingStatusReport = false;
-        std::string dhms = QDateTime::fromTime_t(s_systemTime->getRunningTime_secs()).toLocalTime().toString("dd:hh:mm:ss").toStdString();
+
+        std::string dhms =
+                QDateTime::fromTime_t(s_systemTime->getRunningTime_secs()).
+                toLocalTime().toString("dd:hh:mm:ss").toStdString();
+
         trace->info(CYAN "    runtime {}, cputemp {:.1f}" RESET,
                     dhms,
                     System::cpuTemperature());

@@ -53,6 +53,11 @@ public:
         return sec * NS_IN_SEC + nsec;
     }
 
+    // not implemented yet for non-VCTCXO builds.
+    // Toying with the idea to replace the ifdef rubbish with runtime conditionals
+    // leads to stuff like this which is unfortunately rubbish as well.
+    void setWallclock(int64_t epoch);
+
     void adjustSystemTime_ns(int64_t adjustment_ns);
 
     void setPPM(double ppm);
@@ -63,7 +68,7 @@ public:
 private:
     int64_t getKernelSystemTime();
 
-    void setSystemTime(int64_t epoch);
+    void setSystemTime(int64_t epoch); // fixit wallclock or systemtime ?
 
 private:
     bool m_server;

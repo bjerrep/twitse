@@ -88,7 +88,7 @@ double I2C_Access::readTemperature()
         .len = 2,
         .buf = (I2CBUFPTR*) &reading
     }
-};
+    };
 
     struct i2c_rdwr_ioctl_data data = {
         .msgs = msgs,
@@ -109,7 +109,7 @@ double I2C_Access::readTemperature()
 void I2C_Access::writeVCTCXO_DAC(uint16_t value)
 {
     s_systemTime->setPPM(value);
-    writeMAX5217BGUA(value);
-    //writeLTC2606IDD1(value);
+    //writeMAX5217BGUA(value);
+    writeLTC2606IDD1(value);
 }
 

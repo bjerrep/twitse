@@ -24,6 +24,7 @@ Device::Device(QObject* parent, const QString& clientName, const QHostAddress& a
     : QObject(parent),
       m_name(clientName),
       m_server(new QTcpServer(this)),
+      m_wallclockFifo(100),
       m_udp(new QUdpSocket(this)),
       m_lock(clientName.toStdString())
 {
@@ -81,9 +82,9 @@ void Device::sendServerTimeUDP()
 }
 
 
-void Device::processTimeSample(int64_t serverTime, int64_t localTime)
+void Device::processTimeSample(int64_t remoteTime, int64_t localTime)
 {
-    m_measurementSeries->add(serverTime, localTime);
+    m_measurementSeries->add(remoteTime, localTime);
 }
 
 
@@ -135,6 +136,11 @@ void Device::processMeasurement(const RxPacket& rx)
     }
 
     double clientoffset_us = clientoffset_ns / 1000.0;
+
+    if (m_initState == InitState::RUNNING)
+    {
+        emit signalNewOffsetMeasurement(m_name, clientoffset_us);
+    }
 
     if (!m_averagesInitialized)
     {
@@ -233,7 +239,15 @@ void Device::processMeasurement(const RxPacket& rx)
     }
     m_udpOverruns = 0;
 
-    if (m_clockAdjust > 0 && --m_clockAdjust == 0)
+    if (m_initState == InitState::PPM_MEASUREMENTS)
+    {
+        if (--m_initStateCounter == 0)
+        {
+            m_initState = InitState::CLIENT_CONFIGURING;
+        }
+    }
+
+    if (m_initState == InitState::CLIENT_CONFIGURING)
     {
         int64_t client_adjustment_ns = (int64_t) client2server_ns - roundtrip_ns / 2;
 
@@ -243,23 +257,35 @@ void Device::processMeasurement(const RxPacket& rx)
         QJsonObject json;
         json["command"] = "adjustclock";
         double ppm = m_offsetMeasurementHistory->getPPM();
-        int64_t future = 0.5 * ppm * 1000.0 *
-                m_offsetMeasurementHistory->getLastTimespan_sec();
 
-        json["adjust_ns"] = QString::number(client_adjustment_ns + future);
+        int64_t future_ns = 0.5 * ppm * 1000.0 * m_offsetMeasurementHistory->getLastTimespan_sec();
+
+        json["adjust_ns"] = QString::number(client_adjustment_ns + future_ns);
         json["set_ppm"] = QString::number(-ppm);
+
+        if (VCTCXO_MODE)
+        {
+            int64_t wall_offset = 0;
+            for (int i = 0; i < 100; ++i)
+            {
+                wall_offset += s_systemTime->getWallClock() - s_systemTime->getRawSystemTime();
+            }
+            wall_offset /= 100;
+            json["wall_offset"] = QString::number(wall_offset);
+        }
+
         tcpTx(json);
 
         trace->info("{}adjusting client system time with {} ns and setting ppm to {:7.3f}", getLogName(), client_adjustment_ns, ppm);
 
         m_offsetMeasurementHistory->enableAverages();
+
+        m_initState = InitState::RUNNING;
     }
     else
     {
         sampleRunComplete();
     }
-
-    emit signalNewOffsetMeasurement(m_name, clientoffset_us);
 
     QJsonObject json;
     json["name"] = m_name;
@@ -412,6 +438,42 @@ void Device::slotTcpRx()
         {
             sampleRunComplete();
         }
+        else if (command == "clientwallclock")
+        {
+            int64_t server_initial = rx.value("serverwallclock").toLongLong();
+            int64_t client_clock = rx.value("clientwallclock").toLongLong();
+            int64_t server_now = s_systemTime->getWallClock();
+
+            int64_t roundtrip = server_now - server_initial;
+            int64_t expected_client_time = server_initial + 0.5 * roundtrip;
+            int64_t client_error = client_clock - expected_client_time;
+            if (m_wallclockFifo.add(client_error) || !m_wallclockCounter)
+            {
+                client_error = m_wallclockFifo.getAverage();
+                m_wallclockFifo.reset();
+
+                if (m_wallclockCounter)
+                {
+                    double factor = 1.0 / m_wallclockCounter;
+                    m_wallclockAverage = client_error * factor + m_wallclockAverage * (1.0 - factor);
+                }
+                else
+                {
+                    m_wallclockAverage = client_error;
+                }
+                if (m_wallclockCounter < 100)
+                {
+                    ++m_wallclockCounter;
+                }
+
+                QJsonObject json;
+                json["command"] = "adjustwallclock";
+                json["offset_ns"] = QString::number(m_wallclockAverage);
+                tcpTx(json);
+
+                trace->info("wallclock complete, client error = {:.3f} ms, {:.3f} avg. average {}", client_error / NS_IN_MSEC_F, m_wallclockFifo.getAverage() / NS_IN_MSEC_F, m_wallclockAverage);
+            }
+        }
         else
         {
             accepted = false;
@@ -429,9 +491,9 @@ void Device::slotTcpRx()
 void Device::slotUdpRx()
 {
     int64_t localTime = s_systemTime->getUpdatedSystemTime();
-    int64_t serverTime = *((int64_t*) m_udp->receiveDatagram().data().data());
+    int64_t clientTime = *((int64_t*) m_udp->receiveDatagram().data().data());
 
-    processTimeSample(serverTime, localTime);
+    processTimeSample(clientTime, localTime);
     m_statusReport.packetSentOrReceived();
 
     while (m_udp->hasPendingDatagrams())
