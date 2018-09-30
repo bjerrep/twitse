@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <stdint.h>
+#include <stddef.h>
 
 using SampleList64 = std::vector<int64_t>;
 
