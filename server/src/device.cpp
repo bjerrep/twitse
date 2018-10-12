@@ -162,7 +162,7 @@ void Device::processMeasurement(const RxPacket& rx)
         const double magicnumber_zero = 300;
         const double magicnumber_antislope = 7;
         const double magicnumber_hilock_throttle = 1.0;
-        const double magicnumber_lock_throttle = 1.0;
+        const double magicnumber_lock_throttle = 2.0;
 #else
         const double magicnumber_zero = 800;
         const double magicnumber_antislope = 10000;

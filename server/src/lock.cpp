@@ -57,7 +57,7 @@ int Lock::getPeriodMSecs() const
     case EVENLY_DISTRIBUTED:
         return 1000 * getMeasurementPeriodsecs() / getNofSamples();
     case BURST_SILENCE:
-        return g_minSampleInterval_ms;
+        return MIN_SAMPLE_INTERVAL_ms;
     }
     return 0;
 }
@@ -65,22 +65,23 @@ int Lock::getPeriodMSecs() const
 
 int Lock::getMeasurementPeriodsecs() const
 {
-    const int min_period = (m_maxSamples * g_minSampleInterval_ms) / 1000;
+    const int min_period = (m_maxSamples * MIN_SAMPLE_INTERVAL_ms) / 1000;
 
     if (g_clientPeriod >= 0)
+    {
         return g_clientPeriod + min_period;
+    }
 
-    if (m_quality < 8)
+    if (m_quality < QUALITY_ACCEPT)
     {
         return min_period;
     }
 
-    int period = min_period + (20.0/12.0) * (m_quality - 8);
-    if (period > 30)
-    {
-        return g_maxMeasurementPeriod_sec;
-    }
-    return period;
+    const double periodPerQuality = (MAX_MEAS_PERIOD_sec - min_period) / SPAN_QUALITY;
+
+    int period = static_cast<int> (min_period + periodPerQuality * (m_quality - QUALITY_ACCEPT));
+
+    return std::min(period, MAX_MEAS_PERIOD_sec);
 }
 
 
@@ -89,7 +90,7 @@ int Lock::getNofSamples() const
     if (g_clientSamples >= 0)
         return g_clientSamples;
 
-    const int factor = (m_maxSamples - g_minNofSamples) / MAX_QUALITY;
+    const int factor = (m_maxSamples - MIN_NOF_SAMPLES) / MAX_QUALITY;
     int samples = m_maxSamples - m_quality * factor;
     return samples;
 }

@@ -27,11 +27,6 @@ const int g_clientReconnectPeriod = 3000;
 
 const int g_statusReport = 120000;
 
-const int g_minSampleInterval_ms = 10;
-const int g_minNofSamples = 100;
-const int g_maxNofSamples = 1000;
-const int g_maxMeasurementPeriod_sec = 30;
-
 static const int TIMEROFF = -1;
 
 static const int64_t NS_IN_SEC = 1000000000LL;

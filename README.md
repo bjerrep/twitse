@@ -26,4 +26,9 @@ https://sourceforge.net/p/ptpd/discussion/469208/thread/74b512c5/
 Frequency stability on raspberry 2 with some nice plots:
 https://2n3904blog.com/raspberry-pi-2-frequency-stability/
 
+Hackaday: GPS Disciplined xCXO. A nice writeup about voltage controlled oscillators and DACs.
+https://hackaday.io/project/6872-gps-disciplined-xcxo
+
+
+
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/1f1ddf68d54641658fba20d23c885ad3)](https://www.codacy.com/app/bjerrep/twitse?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=bjerrep/twitse&amp;utm_campaign=Badge_Grade)

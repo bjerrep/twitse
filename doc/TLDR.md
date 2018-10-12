@@ -75,7 +75,9 @@ There are template service scripts for server and client in ./systemd. Edit to g
     
 Remember to run 'systemctl enable <service>' if twitse should run at boot.
 
-Use 'journalctl -f' to run a tail to see the console output once the client or server is running as a service.
+To run a tail on the stdout log messages sent from e.g. the server when running as a service use 
+
+    journalctl -f | grep "server\["
 
 
 ## generating a plot
