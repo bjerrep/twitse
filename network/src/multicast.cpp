@@ -17,12 +17,12 @@ Multicast::Multicast(QString id, const QHostAddress& address, uint16_t port)
     bool success = m_multicastSocket->bind(QHostAddress::AnyIPv4, m_port, QUdpSocket::ShareAddress);
     if (!success)
     {
-        trace->critical("bind failed");
+        trace->critical("multicast bind failed");
     }
     success = m_multicastSocket->joinMulticastGroup(m_hostAddress);
     if (!success)
     {
-        trace->critical("join failed");
+        trace->critical("multicast join failed");
     }
 
     connect(m_multicastSocket, &QUdpSocket::readyRead, this, &Multicast::slotMulticastRx);

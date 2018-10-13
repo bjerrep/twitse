@@ -44,7 +44,7 @@ public:
         return systime + offset;
     }
 
-    int64_t getWallClock()
+    static int64_t getWallClock()
     {
         struct timespec ts = {0};
         clock_gettime(CLOCK_REALTIME, &ts);

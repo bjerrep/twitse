@@ -31,7 +31,7 @@ establishes a single fixed value for the wall clock offset as
 
 This will be sent to clients and they will be able to adjust their CLOCK_REALTIME
 clock accordingly. So user space applications running on the clients should run
-in time sync if they are based on the wall clocks.
+in time sync also in the case they are based on the wall clocks.
 
 What remains is that the client wallclock will slowly drift away from the client
 wallclocks. The future might bring a vctcxo mode on the server as well so the server
@@ -71,7 +71,7 @@ public:
 #endif
     }
     
-    int64_t getWallClock();
+    static int64_t getWallClock();
     void setWallclock(int64_t epoch);
 
     void adjustSystemTime_ns(int64_t adjustment_ns);

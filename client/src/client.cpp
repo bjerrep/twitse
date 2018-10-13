@@ -155,7 +155,7 @@ void Client::multicastRx(MulticastRxPacketPtr rx)
             m_connectionState = ConnectionState::CONNECTING;
             m_serverUid = rx->value("uid");
             QHostAddress address(rx->value("tcpaddress"));
-            uint16_t port = rx->value("tcpport").toInt();
+            uint16_t port = rx->value("tcpport").toUShort();
             startTcpClient(address, port);
             reconnectTimer(false);
         }

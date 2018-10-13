@@ -30,9 +30,8 @@ int main(int argc, char *argv[])
         {"client", "name of the client (for entries starting with '(client)')", "client"}});
 
     parser.process(app);
-    trace->info("transmitting on multicast {}:{}",
-         address.toString().toStdString(),
-                port);
+
+    trace->info("transmitting on multicast {}:{}", address.toString().toStdString(), port);
 
     Control control(&app, parser, address, port);
 }

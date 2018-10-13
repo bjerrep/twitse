@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
                       });
     parser.process(app);
 
-    uint16_t port = parser.value("port").toUInt();
+    uint16_t port = parser.value("port").toUShort();
     if (!port)
     {
         port = g_multicastPort;
