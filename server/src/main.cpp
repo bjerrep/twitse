@@ -2,9 +2,10 @@
 #include "log.h"
 #include "globals.h"
 #include "interface.h"
+#include "system.h"
+
 #include <signal.h>
 #include <execinfo.h>
-
 #include <QCoreApplication>
 #include <QCommandLineParser>
 
@@ -35,12 +36,20 @@ int main(int argc, char *argv[])
     QHostAddress address = QHostAddress(g_multicastIp);
 
     QCommandLineParser parser;
-    parser.setApplicationDescription("hardsync server");
+    if (VCTCXO_MODE)
+    {
+        parser.setApplicationDescription("twitse server - vctcxo build");
+    }
+    else
+    {
+        parser.setApplicationDescription("twitse server - software build");
+    }
     parser.addHelpOption();
     parser.addOptions({
                           {"port", "multicast port", "port"},
                           {"loglevel", "0:error 1:info(default) 2:debug 3:all", "loglevel"},
                           {"samehost", "both server and client runs on the same host, accept unexpected measurements"},
+                          {"ntp_nowait", "(vctcxo) don't wait for ntp sync"},
                           {"turbo", "a development speedup mode with fast (and poor) measurements"}
                       });
     parser.process(app);
@@ -94,6 +103,26 @@ int main(int argc, char *argv[])
         trace->critical("unable to set realtime priority");
     }
 
-    Server server(&app, "server", address, port);
+    if (!parser.isSet("ntp_nowait"))
+    {
+        // Wait for ntp to get synced if it isn't. This is experimental, the
+        // proper solution would probably be that the server didn't
+        // start before ntp was up and running (?)
+        //
+        for (int i=1; i <= 10; i++)
+        {
+            if (!System::ntpSynced())
+            {
+                trace->info("waiting for ntp sync {}:10", i);
+                sleep(1);
+            }
+        }
+        if (!System::ntpSynced())
+        {
+            trace->error("giving up waiting for ntp sync");
+        }
+    }
+
+    Server server(&app, address, port);
     return app.exec();
 }

@@ -64,6 +64,8 @@ bool MathFunc::linearRegression(const SampleList64 &_x, const SampleList64 &_y, 
     return true;
 }
 
+/// Uses zero mean so this is also/actually root mean square as well
+///
 double MathFunc::standardDeviation(const SampleList64 &samples)
 {
     double avg = MathFunc::average(samples);

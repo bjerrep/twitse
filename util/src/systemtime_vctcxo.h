@@ -1,5 +1,6 @@
 #pragma once
 
+#include "log.h"
 #include "globals.h"
 #include <cstdint>
 
@@ -47,19 +48,29 @@ public:
 
     void reset();
 
+    /// not sure if the inline has any effect but it mandates that the implementation is
+    /// to be here in the declarations.
+    ///
     int64_t INLINE getRawSystemTime()
     {
         struct timespec ts;
 
         clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
 
-        uint64_t sec = ts.tv_sec;
-        uint64_t nsec = ts.tv_nsec;
+        int64_t sec = ts.tv_sec;
+        int64_t nsec = ts.tv_nsec;
+        int64_t time = sec * NS_IN_SEC + nsec + m_rawClockOffset;
 
-        return sec * NS_IN_SEC + nsec + m_monotonicClockOffset;
+        if (m_serverPPMRawInitialized)
+        {
+            int64_t server_correction = (((double) time) - m_serverLastPPMSetTime) * (m_server_ppm/1000000.0);
+            return time + server_correction;
+        }
+
+        return time;
     }
 
-    int64_t INLINE getUpdatedSystemTime(int64_t adjustment_ns = 0)
+    int64_t INLINE getUpdatedSystemTime()
     {
 #ifdef CLIENT_USING_REALTIME
         if (m_server)
@@ -86,9 +97,14 @@ private:
 
 private:
     bool m_server;
-    uint16_t m_dac = 0;
     int64_t m_resetTime = 0;
-    // Added at startup as a constant difference between wall clock and the unpredictable CLOCK_MONOTONIC_RAW.
-    // In case the wall clock is sane this will yield sane epoch measurements to look at when developing.
-    int64_t m_monotonicClockOffset = 0;
+    /// Added at startup as a constant difference between wall clock and the unpredictable CLOCK_MONOTONIC_RAW.
+    /// In case the wall clock is sane this will yield sane epoch measurements to look at when developing.
+    int64_t m_rawClockOffset = 0;
+
+    /// the server implements a software ppm correction for tracking the raw realtime clock to the ntp
+    /// controlled wall clock. Alternatively the server could be required to be equipped with a VCTCXO like the clients.
+    double m_server_ppm = 0.0;
+    int64_t m_serverLastPPMSetTime = 0;
+    bool m_serverPPMRawInitialized = false;
 };

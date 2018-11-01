@@ -28,6 +28,10 @@ const int g_clientReconnectPeriod = 3000;
 const int g_statusReport = 120000;
 
 static const int TIMEROFF = -1;
+const int TIMER_20MS = 20;
+const int TIMER_1SEC = 1000;
+const int TIMER_10SECS = 10 * 1000;
+const int TIMER_5MIN = 5 * 60 * 1000;
 
 static const int64_t NS_IN_SEC = 1000000000LL;
 static const int64_t NS_IN_MSEC = 1000000LL;

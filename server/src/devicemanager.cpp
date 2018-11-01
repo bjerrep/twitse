@@ -1,8 +1,6 @@
 #include "devicemanager.h"
 #include "device.h"
-#include "systemtime.h"
 #include "log.h"
-#include "basicoffsetmeasurement.h"
 #include "websocket.h"
 
 #include <QTcpServer>
@@ -43,6 +41,19 @@ bool DeviceManager::activeClients() const
 }
 
 
+bool DeviceManager::allDevicesInRunningState() const
+{
+    for(auto device : m_deviceDeque)
+    {
+        if (device->m_initState != RUNNING)
+        {
+            return false;
+        }
+    }
+    return true;
+
+}
+
 void DeviceManager::process(const MulticastRxPacketPtr rx)
 {
     QString from = rx->value("from");
@@ -50,10 +61,10 @@ void DeviceManager::process(const MulticastRxPacketPtr rx)
 
     if (command == "connect")
     {
-        trace->info("[{}] connection request on {}", from.toStdString(), rx->value("endpoint").toStdString());
+        trace->info("[{:<8}] connection request on {}", from.toStdString(), rx->value("endpoint").toStdString());
         if (findDevice(from))
         {
-            trace->warn("[{}] already registered - connection request ignored", from.toStdString());
+            trace->warn("[{:<8}] already registered - connection request ignored", from.toStdString());
             return;
         }
         Device* newDevice = new Device(this, from);

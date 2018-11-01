@@ -3,7 +3,7 @@
 # twitse
 
 ## What is this
-This is an experimental playground for getting a wireless raspberry pi client and a wired raspberry pi server in 'pretty good' time sync. 
+This is an experimental playground for getting a wireless raspberry pi client and a wired raspberry pi server in 'pretty good' time synchronization.
 
 The following graph shows an hour of measurements on a plain 2.4GHz wifi. It is an ideal sunshine recording (given it seem to work) with unthrottled measurements. It can be interpreted in as many ways as one wants to do it, but the bottom line is that it give a graphical view of the standard deviation and response time for a measurement series. Given the awfull latencies of a wireless connection it doesn't look too bad to have a graph in the microsecond domain.
 
@@ -11,11 +11,11 @@ The following graph shows an hour of measurements on a plain 2.4GHz wifi. It is 
 
 There are some more words
 
-[here](doc/TLDR.md) (standalone mode on unmodified raspberry pi) 
+[here](doc/TLDR.md) (pure software implementation on unmodified raspberry pi) 
 
 and 
 
-[here](doc/VCTCXO.md) (VCTCXO mode, hardware modified raspberry pi).
+[here](doc/VCTCXO.md) (VCTCXO mode, hardware modified raspberry pi where the processor xtal is replaced with a VCTCXO).
 
 <br /><br /><br />
 
@@ -28,6 +28,10 @@ https://2n3904blog.com/raspberry-pi-2-frequency-stability/
 
 Hackaday: GPS Disciplined xCXO. A nice writeup about voltage controlled oscillators and DACs.
 https://hackaday.io/project/6872-gps-disciplined-xcxo
+
+Talk about replacing the raspberry pi X1 crystal as done here in vctcxo mode.
+https://raspberrypi.stackexchange.com/questions/74482/switch-out-the-x1-oscillator-on-a-rpi-2-3
+
 
 
 

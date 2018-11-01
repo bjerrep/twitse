@@ -1,6 +1,4 @@
 #include "txpacket.h"
-#include "systemtime.h"
-#include "globals.h"
 #include "log.h"
 
 #include <QJsonDocument>
@@ -88,10 +86,12 @@ MulticastTxPacket::MulticastTxPacket(const QJsonObject &json)
 {
 }
 
+
 MulticastTxPacket::MulticastTxPacket(const QString &command)
 {
     m_json["command"] = command;
 }
+
 
 MulticastTxPacket::MulticastTxPacket(const QMap<QString, QString> &keyValues)
 {
@@ -108,16 +108,19 @@ QString MulticastTxPacket::value(const QString &key) const
     return m_json.value(key).toString();
 }
 
+
 void MulticastTxPacket::setValue(const QString &key, const QString &value)
 {
     m_json[key] = value;
 }
+
 
 QByteArray MulticastTxPacket::getData(bool serialize)
 {
     QJsonDocument doc(m_json);
     return doc.toJson();
 }
+
 
 QString MulticastTxPacket::toString() const
 {

@@ -54,7 +54,7 @@ DataAnalyse::DataAnalyse(MeasurementSeriesBase* server_calc,
             server_offset_history.add(offset_measurement);
         }
 
-        trace->info(server_offset_history.toString());
+        trace->info(server_offset_history.clientToString(0));
         index++;
     };
 

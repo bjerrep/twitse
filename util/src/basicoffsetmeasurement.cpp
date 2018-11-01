@@ -1,9 +1,7 @@
 #include "basicoffsetmeasurement.h"
 #include "log.h"
-#include "systemtime.h"
 #include "spdlog/fmt/fmt.h"
 #include "datafiles.h"
-#include "globals.h"
 
 #include <QIODevice>
 #include <QFile>

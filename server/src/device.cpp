@@ -24,7 +24,6 @@ Device::Device(QObject* parent, const QString& clientName, const QHostAddress& a
     : QObject(parent),
       m_name(clientName),
       m_server(new QTcpServer(this)),
-      m_wallclockFifo(100),
       m_udp(new QUdpSocket(this)),
       m_lock(clientName.toStdString())
 {
@@ -91,7 +90,6 @@ void Device::processTimeSample(int64_t remoteTime, int64_t localTime)
 void Device::processMeasurement(const RxPacket& rx)
 {
     OffsetMeasurement measurement = m_measurementSeries->calculate();
-    m_offsetMeasurementHistory->add(measurement);
 
     m_statusReport.newMeasurement(m_lock.getNofSamples(),
                                   measurement.m_collectedSamples,
@@ -107,7 +105,12 @@ void Device::processMeasurement(const RxPacket& rx)
     int64_t roundtrip_ns = server2client_ns + client2server_ns;
     double roundtrip_us = roundtrip_ns / 1000.0;
     double roundtrip_ms = roundtrip_us / 1000.0;
+
+    // the central offset from a measurement series
     int64_t clientoffset_ns = (client2server_ns - server2client_ns) / 2;
+
+    measurement.setOffset_ns(clientoffset_ns);
+    m_offsetMeasurementHistory->add(measurement);
 
     // initial guards for sanity. If any one fails then give up.
 
@@ -139,7 +142,10 @@ void Device::processMeasurement(const RxPacket& rx)
 
     if (m_initState == InitState::RUNNING)
     {
-        emit signalNewOffsetMeasurement(m_name, clientoffset_us);
+        emit signalNewOffsetMeasurement(m_name,
+                                        clientoffset_us,
+                                        m_offsetMeasurementHistory->getMeanAbsoluteDeviation_us(),
+                                        m_offsetMeasurementHistory->getSD_us());
     }
 
     if (!m_averagesInitialized)
@@ -155,14 +161,14 @@ void Device::processMeasurement(const RxPacket& rx)
         m_avgRoundtrip_us = 0.9 * m_avgRoundtrip_us + 0.1 * roundtrip_us;
     }
 
-    if (m_ppmActive)
+    if (m_initState == InitState::RUNNING && m_offsetMeasurementHistory->size() > 1)
     {
         // experimental constants.
 #ifdef VCTCXO
         const double magicnumber_zero = 300;
-        const double magicnumber_antislope = 7;
-        const double magicnumber_hilock_throttle = 1.0;
-        const double magicnumber_lock_throttle = 2.0;
+        const double magicnumber_antislope = 7; // 7;
+        const double magicnumber_hilock_throttle = 1.25; //1.0;
+        const double magicnumber_lock_throttle = 1.25;
 #else
         const double magicnumber_zero = 800;
         const double magicnumber_antislope = 10000;
@@ -209,17 +215,21 @@ void Device::processMeasurement(const RxPacket& rx)
         tcpTx(json);
     }
 
+    std::string extra = m_initState != RUNNING ? " (wait)" : "";
+
     m_prev = clientoffset_us;
 
     std::string message = fmt::format(
                 WHITE "{}{:-3d} runtime {:5.1f} roundtrip_us {:5.1f} "
                       "sd_us {:5.1f} period_sec {:2} silence_sec {:2} samples {:4} avgoffs_us {:5.1f} "
-                      "offset_us " YELLOW "{:5.1f}" RESET,
+                      "offset_us " YELLOW "{:5.1f}" RESET "{}",
                 getLogName(), m_offsetMeasurementHistory->getCounter(), s_systemTime->getRunningTime_secs(),
                 roundtrip_us,
                 m_offsetMeasurementHistory->getSD_us(),
                 m_lock.getMeasurementPeriodsecs(), m_lock.getInterMeasurementDelaySecs(), m_lock.getNofSamples(),
-                m_avgClientOffset, clientoffset_us);
+                m_avgClientOffset,
+                clientoffset_us,
+                extra);
 
     trace->info(message);
 
@@ -252,7 +262,6 @@ void Device::processMeasurement(const RxPacket& rx)
         int64_t client_adjustment_ns = (int64_t) client2server_ns - roundtrip_ns / 2;
 
         m_averagesInitialized = false;
-        m_ppmActive = true;
 
         QJsonObject json;
         json["command"] = "adjustclock";
@@ -278,7 +287,8 @@ void Device::processMeasurement(const RxPacket& rx)
 
         trace->info("{}adjusting client system time with {} ns and setting ppm to {:7.3f}", getLogName(), client_adjustment_ns, ppm);
 
-        m_offsetMeasurementHistory->enableAverages();
+        m_offsetMeasurementHistory->reset();
+        //m_offsetMeasurementHistory->enableAverages();
 
         m_initState = InitState::RUNNING;
     }
@@ -438,42 +448,6 @@ void Device::slotTcpRx()
         {
             sampleRunComplete();
         }
-        else if (command == "clientwallclock")
-        {
-            int64_t server_initial = rx.value("serverwallclock").toLongLong();
-            int64_t client_clock = rx.value("clientwallclock").toLongLong();
-            int64_t server_now = s_systemTime->getWallClock();
-
-            int64_t roundtrip = server_now - server_initial;
-            int64_t expected_client_time = server_initial + 0.5 * roundtrip;
-            int64_t client_error = client_clock - expected_client_time;
-            if (m_wallclockFifo.add(client_error) || !m_wallclockCounter)
-            {
-                client_error = m_wallclockFifo.getAverage();
-                m_wallclockFifo.reset();
-
-                if (m_wallclockCounter)
-                {
-                    double factor = 1.0 / m_wallclockCounter;
-                    m_wallclockAverage = client_error * factor + m_wallclockAverage * (1.0 - factor);
-                }
-                else
-                {
-                    m_wallclockAverage = client_error;
-                }
-                if (m_wallclockCounter < 100)
-                {
-                    ++m_wallclockCounter;
-                }
-
-                QJsonObject json;
-                json["command"] = "adjustwallclock";
-                json["offset_ns"] = QString::number(m_wallclockAverage);
-                tcpTx(json);
-
-                trace->info("wallclock complete, client error = {:.3f} ms, {:.3f} avg. average {}", client_error / NS_IN_MSEC_F, m_wallclockFifo.getAverage() / NS_IN_MSEC_F, m_wallclockAverage);
-            }
-        }
         else
         {
             accepted = false;
@@ -524,6 +498,7 @@ void Device::getClientOffset()
 std::string Device::getStatusReport()
 {
     std::string ret = fmt::format("{} {}", name(), m_statusReport.getReport());
+    ret += fmt::format(" mean.abs.dev.us={:.3f}", m_offsetMeasurementHistory->getMeanAbsoluteDeviation_us());
     m_statusReport = StatusReport();
     return ret;
 }
@@ -553,7 +528,7 @@ void Device::sampleRunComplete()
 
 std::string Device::getLogName() const
 {
-    return fmt::format("[{}] ", m_name.toStdString());
+    return fmt::format("[{:<8}] ", m_name.toStdString());
 }
 
 

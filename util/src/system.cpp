@@ -2,6 +2,7 @@
 #include "log.h"
 #include <iostream>
 #include <fstream>
+#include <QProcess>
 
 
 double System::cpuTemperature()
@@ -11,4 +12,13 @@ double System::cpuTemperature()
     istream.getline(output, 100);
     double temp = atoi(output) / 1000.0;
     return temp;
+}
+
+bool System::ntpSynced()
+{
+    QProcess ntp;
+    ntp.start("sh -c \"/usr/bin/timedatectl show\"");
+    ntp.waitForFinished();
+    bool is_in_sync = ntp.readAll().indexOf("NTPSynchronized=yes") != -1;
+    return is_in_sync;
 }

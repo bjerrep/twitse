@@ -11,6 +11,9 @@
 #define I2CBUFPTR uint8_t
 #endif
 
+uint16_t I2C_Access::m_dac = 0x8000;
+bool I2C_Access::m_fixed_dac = false;
+
 
 I2C_Access::I2C_Access(int bus)
 {
@@ -105,11 +108,24 @@ double I2C_Access::readTemperature()
     return temperature;
 }
 
-
-void I2C_Access::writeVCTCXO_DAC(uint16_t value)
+void I2C_Access::setFixedVCTCXO_DAC(bool fixed)
 {
-    s_systemTime->setPPM(value);
-    //writeMAX5217BGUA(value);
-    writeLTC2606IDD1(value);
+    m_fixed_dac = fixed;
+}
+
+void I2C_Access::writeVCTCXO_DAC(uint16_t dac)
+{
+    if (m_fixed_dac)
+    {
+        return;
+    }
+    m_dac = dac;
+    //writeMAX5217BGUA(dac);
+    writeLTC2606IDD1(dac);
+}
+
+uint16_t I2C_Access::getVCTCXO_DAC()
+{
+    return m_dac;
 }
 

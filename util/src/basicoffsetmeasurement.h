@@ -2,8 +2,6 @@
 
 #include "mathfunc.h"
 #include "measurementseriesbase.h"
-#include "offsetmeasurement.h"
-
 
 
 class BasicMeasurementSeries : public MeasurementSeriesBase

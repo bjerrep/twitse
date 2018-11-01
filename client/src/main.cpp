@@ -31,7 +31,15 @@ int main(int argc, char *argv[])
     QHostAddress address = QHostAddress(g_multicastIp);
 
     QCommandLineParser parser;
-    parser.setApplicationDescription("hardsync client");
+    if (VCTCXO_MODE)
+    {
+        parser.setApplicationDescription("twitse client - vctcxo build");
+    }
+    else
+    {
+        parser.setApplicationDescription("twitse client - software build");
+    }
+
     parser.addHelpOption();
     parser.addOptions({
                           {"port", "multicast port", "port"},

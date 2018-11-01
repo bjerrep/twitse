@@ -1,6 +1,5 @@
 #include "multicast.h"
 #include "log.h"
-#include "systemtime.h"
 
 #include <QObject>
 #include <QThread>

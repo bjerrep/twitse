@@ -12,6 +12,12 @@ OffsetMeasurement::OffsetMeasurement(int index, int64_t starttime_ns, int64_t en
 }
 
 
+void OffsetMeasurement::setOffset_ns(int64_t offset_ns)
+{
+    m_clientOffset_ns = offset_ns;
+}
+
+
 std::string OffsetMeasurement::toString() const
 {
     if (!m_collectedSamples)

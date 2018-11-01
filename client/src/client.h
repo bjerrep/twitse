@@ -41,7 +41,10 @@ private:
     void multicastTx(MulticastTxPacket tx);
     void tcpTx(const QJsonObject& json);
     void tcpTx(const std::string& command);
+    bool locked();
     void adjustPPM(double ppm);
+    uint16_t loadDefaultDAC();
+    void saveDefaultDAC(uint16_t dac);
 
     void reconnectTimer(bool on);
     void sendLocalTimeUDP();
@@ -61,7 +64,7 @@ private:
     QCoreApplication* m_parent;
     QString m_name;
     spdlog::level::level_enum m_logLevel;
-    bool m_autoPPM_LSB_Adjust = true;
+    bool m_autoPPMAdjust = true;
     bool m_noClockAdj;
     QString m_serverUid;
 
@@ -78,6 +81,7 @@ private:
     int m_serverPingTimer = TIMEROFF;
     int m_clientPingTimer = TIMEROFF;
     int m_SystemTimeRefreshTimer = TIMEROFF;
+    int m_saveNewDefaultDAC = TIMEROFF;
 
     BasicMeasurementSeries* m_measurementSeries = nullptr;
     OffsetMeasurementHistory m_offsetMeasurementHistory;
@@ -88,6 +92,8 @@ private:
     bool m_measurementInProgress = false;
     int m_expectedNofSamples = 0;
 
+    int m_lockCounter = 0;
+    const int LOCK_MAX = 10;
+
     I2C_Access* m_i2c = nullptr;
-    int64_t m_dacLSB = 0x8000;
 };

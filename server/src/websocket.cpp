@@ -33,13 +33,15 @@ WebSocket::~WebSocket()
 }
 
 
-void WebSocket::slotSendOffsetMeasurement(const QString &clientName, double offset_us)
+void WebSocket::slotSendOffsetMeasurement(const QString &clientName, double offset_us, double mean_abs_dev, double rms)
 {
     auto json = new QJsonObject;
     (*json)["name"] = clientName;
     int64_t now_ms = s_systemTime->getWallClock() / NS_IN_MSEC;
     (*json)["time"] = QString::number(now_ms);
     (*json)["value"] = QString::number(offset_us);
+    (*json)["meanabsdev"] = QString::number(mean_abs_dev);
+    (*json)["rms"] = QString::number(rms);
 
     QJsonDocument doc(*json);
 
@@ -62,6 +64,24 @@ void WebSocket::slotSendOffsetMeasurement(const QString &clientName, double offs
         {
             break;
         }
+    }
+}
+
+
+void WebSocket::sendWallOffset()
+{
+    auto json = new QJsonObject;
+    (*json)["name"] = "server";
+    (*json)["command"] = "walloffset";
+
+    double diff_sec = (s_systemTime->getRawSystemTime() - s_systemTime->getWallClock()) / NS_IN_SEC_F;
+    (*json)["value"] = fmt::format("{:.6f}", diff_sec).c_str();
+
+    QJsonDocument doc(*json);
+
+    for (QWebSocket* socket : m_clients)
+    {
+        socket->sendTextMessage(doc.toJson());
     }
 }
 
@@ -103,6 +123,10 @@ void WebSocket::slotTextMessageReceived(const QString& message)
     else if (command == "server_restart")
     {
         QCoreApplication::quit();
+    }
+    else if (command == "get_wall_offset")
+    {
+        sendWallOffset();
     }
 
     else

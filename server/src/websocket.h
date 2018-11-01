@@ -15,7 +15,10 @@ public:
     WebSocket(uint16_t port);
     ~WebSocket();
 
-    void slotSendOffsetMeasurement(const QString& clientName, double offset_us);
+    void slotSendOffsetMeasurement(const QString& clientName, double offset_us, double mean_abs_dev, double rms);
+
+private:
+    void sendWallOffset();
 
 signals:
     void signalNewWebsocketConnection();

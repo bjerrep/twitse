@@ -55,6 +55,7 @@ public:
             double losspct = 100.0 * (m_sent - m_received) / m_sent;
             loss = fmt::format("loss% {:.1f}", losspct);
         }
+
         std::string ret = fmt::format("packet/sec {:.0f} {} {}", m_nofPackets/elapsed, loss, used);
         return ret;
     }
@@ -103,7 +104,7 @@ private:
 signals:
     void signalRequestSamples(QString name, int, int);
     void signalConnectionLost(QString name);
-    void signalNewOffsetMeasurement(const QString&, double);
+    void signalNewOffsetMeasurement(const QString&, double, double, double);
     void signalWebsocketTransmit(const QJsonObject& json);
 
 public slots:
@@ -124,9 +125,6 @@ public:
     int m_sampleRunTimer = TIMEROFF;
     int m_clientPingTimer = TIMEROFF;
     int m_clientPingCounter = 0;
-    int m_wallclockCounter = 0;
-    int64_t m_wallclockAverage = 0;
-    MathFifo m_wallclockFifo;
     QString m_serverAddress;
     QUdpSocket* m_udp;
     QHostAddress m_clientAddress;
@@ -141,7 +139,6 @@ public:
     InitState m_initState = InitState::PPM_MEASUREMENTS;
     bool m_averagesInitialized = false;
     double m_avgClientOffset = 0.0;
-    bool m_ppmActive = false;
     double m_prev = 0.0;
     Lock m_lock;
     StatusReport m_statusReport;

@@ -55,6 +55,8 @@ public:
     int getNofSamples() const;
     static std::string toColorString(LockState state);
     static std::string toString(LockState state);
+    static void setClientPeriod(int period);
+    static void setClientSamples(int samples);
     LockState errorOffset(double offset);
     void panic();
 
@@ -68,4 +70,7 @@ private:
     int m_quality = 0;
     int m_maxSamples = MAX_NOF_SAMPLES;
     Distribution m_distribution = BURST_SILENCE;
+    static int s_clientPeriod;
+    static int s_clientSamples;
+
 };

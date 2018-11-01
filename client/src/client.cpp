@@ -11,6 +11,8 @@
 #include <QTimer>
 #include <QCommandLineParser>
 #include <QNetworkDatagram>
+#include <QFile>
+#include <math.h>
 
 extern DevelopmentMask g_developmentMask;
 SystemTime* s_systemTime = nullptr;
@@ -27,26 +29,38 @@ Client::Client(QCoreApplication *parent, QString name,
 {
     s_systemTime = new SystemTime(false);
 
-#ifdef VCTCXO
-    m_i2c = new I2C_Access(1);
-    m_i2c->writeVCTCXO_DAC(m_dacLSB);
-    double luhab_temperature = m_i2c->readTemperature();
-    trace->info("luhab carrier board temperature is {:.1f} °C", luhab_temperature);
-#endif
-
     qRegisterMetaType<UdpRxPacketPtr>("UdpRxPacketPtr");
     qRegisterMetaType<TcpRxPacketPtr>("TcpRxPacketPtr");
     qRegisterMetaType<MulticastRxPacketPtr>("MulticastRxPacketPtr");
 
     reset();
 
-    if (!autoPPM_LSB)
+    if (VCTCXO_MODE)
     {
-        s_systemTime->setPPM(fixedPPM_LSB);
-        m_dacLSB = fixedPPM_LSB;
-        s_systemTime->setPPM(m_dacLSB);
-        m_autoPPM_LSB_Adjust = false;
-        trace->info("setting fixed ppm/lsb to to {}", fixedPPM_LSB);
+        m_i2c = new I2C_Access(1);
+
+        double luhab_temperature = m_i2c->readTemperature();
+        trace->info("luhab carrier board temperature is {:.1f} °C", luhab_temperature);
+
+        if (autoPPM_LSB)
+        {
+            m_i2c->writeVCTCXO_DAC(loadDefaultDAC());
+        }
+        else
+        {
+            m_i2c->writeVCTCXO_DAC(fixedPPM_LSB);
+            m_i2c->setFixedVCTCXO_DAC(true);
+            trace->info("setting fixed dac to to {}", fixedPPM_LSB);
+        }
+    }
+    else // std
+    {
+        if (!autoPPM_LSB)
+        {
+            s_systemTime->setPPM(fixedPPM_LSB);
+            m_autoPPMAdjust = false;
+            trace->info("setting fixed ppm/lsb to to {}", fixedPPM_LSB);
+        }
     }
 
     m_multicastThread = new QThread(parent);
@@ -62,7 +76,7 @@ Client::Client(QCoreApplication *parent, QString name,
 
     sendServerConnectRequest();
 
-    m_SystemTimeRefreshTimer = startTimer(20);
+    m_SystemTimeRefreshTimer = startTimer(TIMER_20MS);
 }
 
 
@@ -93,9 +107,58 @@ void Client::reset()
     m_setInitialLocalPPM = true;
     s_systemTime->reset();
     m_measurementInProgress = false;
-#ifdef VCTCXO
-    m_i2c->writeVCTCXO_DAC(m_dacLSB = 0x8000);
-#endif
+
+    if (VCTCXO_MODE)
+    {
+        if (m_saveNewDefaultDAC != TIMEROFF)
+        {
+            killTimer(m_saveNewDefaultDAC);
+        }
+        m_saveNewDefaultDAC = startTimer(TIMER_5MIN);
+        if (m_i2c)
+        {
+            m_i2c->writeVCTCXO_DAC(loadDefaultDAC());
+        }
+    }
+}
+
+
+uint16_t Client::loadDefaultDAC()
+{
+    uint16_t dac = 0x8000;
+
+    if (VCTCXO_MODE)
+    {
+        QFile file(QCoreApplication::applicationDirPath() + "/default.dac");
+        if (file.open(QIODevice::ReadOnly))
+        {
+            dac = file.readAll().toUShort();
+            trace->info("loaded vctcxo dac = {} from default.dac", dac);
+        }
+        else
+        {
+            trace->warn("couldn't open default.dac, using vctcxo dac = {}", dac);
+        }
+    }
+    return dac;
+}
+
+
+void Client::saveDefaultDAC(uint16_t dac)
+{
+    dac = (loadDefaultDAC() + dac) / 2;
+
+    QFile file(QCoreApplication::applicationDirPath() + "/default.dac");
+    if (file.open(QIODevice::WriteOnly))
+    {
+        QTextStream stream(&file);
+        stream << QString::number(dac);
+        trace->info("saved new default vctcxo dac = {} to default.dac", dac);
+    }
+    else
+    {
+        trace->warn("couldn't save new default vctcxo dac = {} to default.dac", dac);
+    }
 }
 
 
@@ -193,14 +256,14 @@ void Client::executeControl(MulticastRxPacketPtr rx)
         if (value == "auto")
         {
             trace->info("setting vctcxo to auto");
-            m_autoPPM_LSB_Adjust = true;
+            m_i2c->setFixedVCTCXO_DAC(false);
         }
         else
         {
             uint16_t dac = value.toUShort();
             m_i2c->writeVCTCXO_DAC(dac);
+            m_i2c->setFixedVCTCXO_DAC(true);
             trace->info("setting vctcxo to fixed value {} (0x{:04x})", dac, dac);
-            m_autoPPM_LSB_Adjust = false;
         }
 #else
         trace->error("running in standalone mode, there is no dac here");
@@ -251,7 +314,7 @@ void Client::tcpRx()
 
     while(m_tcpReadBuffer.size() >= 2)
     {
-        uint16_t length = *(uint16_t*) m_tcpReadBuffer.constData();
+        uint16_t length = *(const uint16_t*) m_tcpReadBuffer.constData();
         if (m_tcpReadBuffer.size() < length + 2)
         {
             return;
@@ -329,7 +392,7 @@ void Client::tcpRx()
                 double local_ppm = m_offsetMeasurementHistory.getPPM();
                 //double server_ppm = rx.value("set_ppm").toDouble();
 
-                if (m_setInitialLocalPPM and m_autoPPM_LSB_Adjust)
+                if (m_setInitialLocalPPM and m_autoPPMAdjust)
                 {
                     adjustPPM(local_ppm);
                     m_setInitialLocalPPM = false;
@@ -343,25 +406,14 @@ void Client::tcpRx()
                 trace->info("adjusting wallclock to {}", s_systemTime->getWallClock());
             }
             m_offsetMeasurementHistory.reset();
-            m_offsetMeasurementHistory.enableAverages();
         }
         else if (command == "adjustppm")
         {
-            if (m_autoPPM_LSB_Adjust)
+            if (m_autoPPMAdjust)
             {
                 double ppm = rx.value("ppm_adjust").toDouble();
                 adjustPPM(ppm);
             }
-        }
-        else if (command == "serverwallclock")
-        {
-            QJsonObject json; // fixit
-            json["command"] = "clientwallclock";
-            json["serverwallclock"] = rx.value("serverwallclock");
-            json["clientwallclock"] = QString::number(s_systemTime->getWallClock());
-
-            //trace->info("got server wallclock {}, returning client wallclock {}", rx.value("serverwallclock").toStdString(), s_systemTime->getWallClock()); // fixit, remove ?
-            tcpTx(json);
         }
         else if (command == "adjustwallclock")
         {
@@ -396,38 +448,68 @@ void Client::tcpTx(const std::string& command)
 }
 
 
+bool Client::locked()
+{
+    return m_lockCounter == LOCK_MAX;
+}
+
+
 void Client::adjustPPM(double ppm)
 {
-#ifndef VCTCXO
-    s_systemTime->setPPM(ppm);
-#else
-    if (!m_autoPPM_LSB_Adjust)
+    if (VCTCXO_MODE)
     {
-        return;
+        if (!m_autoPPMAdjust)
+        {
+            return;
+        }
+
+        std::string extras = "";
+
+        // Local detection of a stable time lock. A stable time lock is the criteria for
+        // saving a new updated default dac to file. Note that the server currently have
+        // a limit of relative ppm adjustments of +/- 0.1 as a protection against spurious
+        // bogus measurements.
+        if (std::fabs(ppm) < 0.08)
+        {
+            if( m_lockCounter != LOCK_MAX )
+            {
+                if (++m_lockCounter == LOCK_MAX)
+                {
+                    extras = ". Hard lock entered";
+                }
+            }
+        }
+        else
+        {
+            if (m_lockCounter == LOCK_MAX)
+            {
+                extras = ". Hard lock lost";
+            }
+            m_lockCounter = 0;
+        }
+
+        // vctcxo "ASVTX-11-121-19.200MHz-T", nomimal +/-8ppm
+        const double lsb_per_ppm = 2600.0;
+
+        int64_t dac = I2C_Access::getVCTCXO_DAC();
+
+        int new_dac = dac - ppm * lsb_per_ppm;
+
+        new_dac = qBound(0, new_dac, 0xFFFF);
+
+        if (new_dac == 0 || new_dac == 0xFFFF)
+        {
+            trace->critical("dac is saturated");
+        }
+
+        // not exactly a graceful way to adjust the dac
+        m_i2c->writeVCTCXO_DAC(new_dac);
+        trace->info("adjusted {:.6f} ppm. DAC adjusted {} from {} to {} lsb{}", ppm, new_dac - dac, dac, new_dac, extras);
     }
-    // vctcxo "ASVTX-11-121-19.200MHz-T", nomimal +/-8ppm
-    const double lsb_per_ppm = 2800.0;
-
-    int64_t dacLSBcopy = m_dacLSB;
-
-    m_dacLSB -= ppm * lsb_per_ppm;
-
-    if (m_dacLSB < 0)
+    else // std
     {
-        m_dacLSB = 0;
+        s_systemTime->setPPM(ppm);
     }
-    else if (m_dacLSB > 0xFFFF)
-    {
-        m_dacLSB = 0xFFFF;
-    }
-    if (m_dacLSB == 0 || m_dacLSB == 0xFFFF)
-    {
-        trace->critical("dac is saturated");
-    }
-
-    m_i2c->writeVCTCXO_DAC(m_dacLSB);
-    trace->debug("ppm adjusted {} from {} to {} lsb", m_dacLSB - dacLSBcopy, dacLSBcopy, m_dacLSB);
-#endif
 }
 
 
@@ -481,6 +563,15 @@ void Client::timerEvent(QTimerEvent* timerEvent)
     {
         tcpTx("ping");
     }
+    else if (VCTCXO_MODE && timerid == m_saveNewDefaultDAC)
+    {
+        if (locked())
+        {
+            saveDefaultDAC(I2C_Access::getVCTCXO_DAC());
+            killTimer(m_saveNewDefaultDAC);
+            m_saveNewDefaultDAC = TIMEROFF;
+        }
+    }
     else
     {
         trace->warn("got unexpected timer event");
@@ -524,7 +615,7 @@ OffsetMeasurement Client::finalizeMeasurementRun()
     if (summary.m_valid)
     {
         m_offsetMeasurementHistory.add(summary);
-        trace->info(m_offsetMeasurementHistory.toString());
+        trace->info(m_offsetMeasurementHistory.clientToString(I2C_Access::getVCTCXO_DAC()));
     }
     else
     {

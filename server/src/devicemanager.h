@@ -22,6 +22,7 @@ public:
     Device* findDevice(const QString &name);
     const DeviceDeque& getDevices() const;
     bool activeClients() const;
+    bool allDevicesInRunningState() const;
 
 signals:
     void signalMulticastTx(MulticastTxPacket& tx);

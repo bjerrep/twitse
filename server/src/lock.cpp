@@ -2,8 +2,9 @@
 #include "log.h"
 
 extern DevelopmentMask g_developmentMask;
-extern int g_clientPeriod;
-extern int g_clientSamples;
+
+int Lock::s_clientPeriod = -1;
+int Lock::s_clientSamples = -1;
 
 
 Lock::Lock(const std::string &clientname)
@@ -42,8 +43,8 @@ int Lock::getInterMeasurementDelaySecs() const
     case EVENLY_DISTRIBUTED:
         return 0;
     case BURST_SILENCE:
-        if (g_clientPeriod >= 0)
-            return g_clientPeriod;
+        if (s_clientPeriod >= 0)
+            return s_clientPeriod;
         return getMeasurementPeriodsecs() - getNofSamples() * getPeriodMSecs() / 1000.0;
     }
     return 0;
@@ -62,14 +63,25 @@ int Lock::getPeriodMSecs() const
     return 0;
 }
 
+void Lock::setClientPeriod(int period)
+{
+    s_clientPeriod = period;
+}
+
+
+void Lock::setClientSamples(int samples)
+{
+    s_clientSamples = samples;
+}
+
 
 int Lock::getMeasurementPeriodsecs() const
 {
     const int min_period = (m_maxSamples * MIN_SAMPLE_INTERVAL_ms) / 1000;
 
-    if (g_clientPeriod >= 0)
+    if (s_clientPeriod >= 0)
     {
-        return g_clientPeriod + min_period;
+        return s_clientPeriod + min_period;
     }
 
     if (m_quality < QUALITY_ACCEPT)
@@ -87,8 +99,8 @@ int Lock::getMeasurementPeriodsecs() const
 
 int Lock::getNofSamples() const
 {
-    if (g_clientSamples >= 0)
-        return g_clientSamples;
+    if (s_clientSamples >= 0)
+        return s_clientSamples;
 
     const int factor = (m_maxSamples - MIN_NOF_SAMPLES) / MAX_QUALITY;
     int samples = m_maxSamples - m_quality * factor;

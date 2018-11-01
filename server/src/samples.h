@@ -1,5 +1,5 @@
 #pragma once
-
+#include "globals.h"
 #include <QObject>
 #include <QList>
 #include <QJsonObject>
@@ -20,8 +20,6 @@ public:
 class Samples : public QObject
 {
     Q_OBJECT
-
-    const int TIMEROFF = -1;
 
 public:
     Samples();

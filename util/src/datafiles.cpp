@@ -49,6 +49,7 @@ void DataFiles::appendValues(QString name, int64_t *a, int64_t *b, int64_t *bb, 
     }
 }
 
+
 void DataFiles::fileApp(QString name, double val, bool newline)
 {
     name += ".data";
@@ -64,6 +65,7 @@ void DataFiles::fileApp(QString name, double val, bool newline)
     }
 }
 
+
 void DataFiles::fileApp(QString name, int64_t val, bool newline)
 {
     name += ".data";
@@ -78,6 +80,7 @@ void DataFiles::fileApp(QString name, int64_t val, bool newline)
             stream << " ";
     }
 }
+
 
 void DataFiles::fileApp(const std::string& name, const std::string& message)
 {
