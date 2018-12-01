@@ -1,3 +1,5 @@
+dist: xenial
+
 language: cpp
 
 compiler:
@@ -6,13 +8,13 @@ compiler:
 before_install:
   - sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 1397BC53640DB551
   - sudo apt-add-repository --yes ppa:ubuntu-toolchain-r/test
-  - sudo apt-add-repository --yes ppa:beineri/opt-qt591-trusty
+  - sudo apt-add-repository --yes ppa:beineri/opt-qt-5.11.2-xenial
   - sudo apt-get update -qq
  
 install:
   - sudo apt-get install -qq g++-6
-  - sudo apt-get --yes install qt59-meta-minimal
-  - sudo apt-get --yes install qt59websockets
+  - sudo apt-get --yes install qt511-meta-minimal
+  - sudo apt-get --yes install qt511websockets
   - if [ "$CXX" = "g++" ]; then export CXX="g++-6" CC="gcc-6"; fi
   - sudo apt-get install libi2c-dev
 
