@@ -25,7 +25,7 @@ public:
     std::string clientToString(uint16_t dac) const;
     OffsetMeasurementVector getMeasurementsSummary() const;
     int getCounter() const;
-    int size() const;
+    size_t size() const;
 
 private:
     void update();
@@ -46,7 +46,7 @@ private:
     double m_averageSlope = 0.0;
     double m_averageOffset_ns = 0.0;
     double m_movingAverageOffset_ns = 0.0;
-    bool m_initialize = true;
+    int m_initialize = NOF_INITIAL_PPM_MEASUREMENTS + 1;
     int m_totalMeasurements = 0;
 
     friend class DataAnalyse;

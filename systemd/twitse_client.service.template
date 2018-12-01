@@ -7,7 +7,7 @@ After=network-online.target
 Type=simple
 User=root
 WorkingDirectory=<git root>
-ExecStart=<git root>/bin/client --id <name>
+ExecStart=<git root>/bin/twitse_client --id <name>
 Restart=on-failure
 
 [Install]

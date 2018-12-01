@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
     ls.waitForFinished();
     QStringList serverfiles = QString(ls.readAll()).split("\n", QString::SkipEmptyParts);
 
-    if (!serverfiles.size())
+    if (serverfiles.empty())
     {
         trace->critical("no files found?");
         exit(1);
@@ -43,8 +43,8 @@ int main(int argc, char *argv[])
 
     trace->info("Analysing {} containing {} files", QDir::currentPath().toStdString(), serverfiles.size());
 
-    MeasurementSeriesBase* server_timing = new BasicMeasurementSeries();
-    MeasurementSeriesBase* client_timing = new BasicMeasurementSeries();
+    MeasurementSeriesBase* server_timing = new BasicMeasurementSeries("server", MeasurementSeriesBase::LOWEST_VALUES);
+    MeasurementSeriesBase* client_timing = new BasicMeasurementSeries("client", MeasurementSeriesBase::LOWEST_VALUES);
 
     DataAnalyse data(server_timing, client_timing, serverfiles, clientfiles);
     trace->info("exit");

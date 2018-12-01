@@ -13,7 +13,8 @@ external/spdlog
 .gitmodules
 
 #devel scripts
-export.sh
+*.sh
+doc/notes
 
 #editor backups
 *.kate-swp

@@ -5,28 +5,18 @@
 #include <QObject>
 
 
-void timerOff(QObject* host, int& timerId, bool quiet)
+void timerOff(QObject* host, int& timerId)
 {
     if (timerId != TIMEROFF)
     {
         host->killTimer(timerId);
         timerId = TIMEROFF;
     }
-    else if (!quiet)
-    {
-        trace->warn("timer already off");
-    }
 }
 
 
 void timerOn(QObject* host, int& timerId, int period)
 {
-    if (timerId == TIMEROFF)
-    {
-        timerId = host->startTimer(period);
-    }
-    else
-    {
-        trace->warn("timer already on");
-    }
+    timerOff(host, timerId);
+    timerId = host->startTimer(period);
 }

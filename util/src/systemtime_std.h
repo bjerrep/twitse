@@ -16,10 +16,10 @@ public:
 
     inline int64_t INLINE getRawSystemTime()
     {
-        struct timespec ts = {0};
+        struct timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);
-        uint64_t sec = ts.tv_sec;
-        uint64_t nsec = ts.tv_nsec;
+        int64_t sec = ts.tv_sec;
+        int64_t nsec = ts.tv_nsec;
 
         return sec * NS_IN_SEC + nsec;
     }
@@ -44,19 +44,19 @@ public:
         return systime + offset;
     }
 
-    static int64_t getWallClock()
+    static int64_t getWallClock_ns()
     {
-        struct timespec ts = {0};
+        struct timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);
-        uint64_t sec = ts.tv_sec;
-        uint64_t nsec = ts.tv_nsec;
+        int64_t sec = ts.tv_sec;
+        int64_t nsec = ts.tv_nsec;
         return sec * NS_IN_SEC + nsec;
     }
 
     // not implemented yet for non-VCTCXO builds.
     // Toying with the idea to replace the ifdef rubbish with runtime conditionals
     // leads to stuff like this which is unfortunately rubbish as well.
-    void setWallclock(int64_t epoch);
+    void setWallclock_ns(int64_t epoch);
 
     void adjustSystemTime_ns(int64_t adjustment_ns);
 
@@ -68,7 +68,7 @@ public:
 private:
     int64_t getKernelSystemTime();
 
-    void setSystemTime(int64_t epoch); // fixit wallclock or systemtime ?
+    void setSystemTime(int64_t epoch);
 
 private:
     bool m_server;

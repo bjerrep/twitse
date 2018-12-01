@@ -4,7 +4,7 @@
 #include "interface.h"
 #include "globals.h"
 
-#include <signal.h>
+#include <csignal>
 #include <execinfo.h>
 #include <QCommandLineParser>
 
@@ -15,7 +15,7 @@ DevelopmentMask g_developmentMask = DevelopmentMask::None;
 void signalHandler(int signal)
 {
     void *array[100];
-    size_t entries = backtrace(array, 100);
+    int entries = backtrace(array, 100);
     trace->critical("caught signal {}", signal);
     backtrace_symbols_fd(array, entries, STDOUT_FILENO);
     exit(EXIT_FAILURE);
@@ -66,10 +66,10 @@ int main(int argc, char *argv[])
         use_fixed_adjust = true;
     }
 
-    QString name = parser.value("id");
-    if (name.isEmpty())
+    QString id = parser.value("id");
+    if (id.isEmpty())
     {
-        trace->critical("need a name (--id)");
+        trace->critical("need a unique identifier (--id)");
         exit(1);
     }
 
@@ -87,11 +87,10 @@ int main(int argc, char *argv[])
     spdlog::set_level(loglevel);
     spdlog::set_pattern(logformat);
 
-#ifdef VCTCXO
-        trace->info("client " WHITE "'{}'" RESET " running in vctcxo mode", name.toStdString());
-#else
-        trace->info("client " WHITE "'{}'" RESET " running in standalone mode", name.toStdString());
-#endif
+    if (VCTCXO_MODE)
+        trace->info("client " WHITE "'{}'" RESET " running in vctcxo mode", id.toStdString());
+    else
+        trace->info("client " WHITE "'{}'" RESET " running in software mode", id.toStdString());
 
     trace->info("listening on multicast {}:{} on interface {}",
                 address.toString().toStdString(),
@@ -105,7 +104,7 @@ int main(int argc, char *argv[])
         trace->critical("unable to set realtime priority");
     }
 
-    Client client(&app, name, address, port, loglevel, no_clock_adj, !use_fixed_adjust, fixed_adjust);
+    Client client(&app, id, address, port, loglevel, no_clock_adj, !use_fixed_adjust, fixed_adjust);
 
     return app.exec();
 }

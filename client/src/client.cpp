@@ -9,21 +9,21 @@
 #include <QObject>
 #include <QThread>
 #include <QTimer>
-#include <QCommandLineParser>
 #include <QNetworkDatagram>
 #include <QFile>
-#include <math.h>
+#include <cmath>
 
 extern DevelopmentMask g_developmentMask;
+extern int g_randomTrashPromille;
 SystemTime* s_systemTime = nullptr;
 
 
-Client::Client(QCoreApplication *parent, QString name,
+Client::Client(QCoreApplication *parent, const QString& id,
                const QHostAddress &address, uint16_t port,
                spdlog::level::level_enum loglevel,
                bool no_clock_adj, bool autoPPM_LSB, double fixedPPM_LSB)
     : m_parent(parent),
-      m_name(name),
+      m_id(id),
       m_logLevel(loglevel),
       m_noClockAdj(no_clock_adj)
 {
@@ -31,7 +31,7 @@ Client::Client(QCoreApplication *parent, QString name,
 
     qRegisterMetaType<UdpRxPacketPtr>("UdpRxPacketPtr");
     qRegisterMetaType<TcpRxPacketPtr>("TcpRxPacketPtr");
-    qRegisterMetaType<MulticastRxPacketPtr>("MulticastRxPacketPtr");
+    qRegisterMetaType<MulticastRxPacket>("MulticastRxPacket");
 
     reset();
 
@@ -53,7 +53,7 @@ Client::Client(QCoreApplication *parent, QString name,
             trace->info("setting fixed dac to to {}", fixedPPM_LSB);
         }
     }
-    else // std
+    else // software
     {
         if (!autoPPM_LSB)
         {
@@ -64,7 +64,7 @@ Client::Client(QCoreApplication *parent, QString name,
     }
 
     m_multicastThread = new QThread(parent);
-    m_multicast = new Multicast(name, address, port);
+    m_multicast = new Multicast(id, address, port);
 
     connect(parent, &QCoreApplication::aboutToQuit, m_multicastThread, &QThread::quit);
     connect(m_multicastThread, &QThread::finished, m_multicastThread, &QThread::deleteLater);
@@ -92,7 +92,8 @@ void Client::reset()
     trace->debug("client is resetting");
     m_connectionState = ConnectionState::NOT_CONNECTED;
     delete m_measurementSeries;
-    m_measurementSeries = new BasicMeasurementSeries();
+
+    m_measurementSeries = new BasicMeasurementSeries(m_id.toStdString());
     m_offsetMeasurementHistory.reset();
     m_tcpSocket.close();
     if (m_udpSocket)
@@ -173,8 +174,8 @@ void Client::reconnectTimer(bool on)
 
         trace->info("contacting server");
         timerOn(this, m_reconnectTimer, g_clientReconnectPeriod);
-        timerOff(this, m_serverPingTimer, true);
-        timerOff(this, m_clientPingTimer, true);
+        timerOff(this, m_serverPingTimer);
+        timerOff(this, m_clientPingTimer);
     }
     else
     {
@@ -190,35 +191,35 @@ void Client::reconnectTimer(bool on)
 }
 
 
-void Client::multicastRx(MulticastRxPacketPtr rx)
+void Client::multicastRx(const MulticastRxPacket& rx)
 {
     if (m_logLevel == spdlog::level::trace)
     {
-        trace->trace("rx multicast: {}", rx->toString().toStdString());
+        trace->trace("rx multicast: {}", rx.toString().toStdString());
     }
 
     if (m_connectionState == ConnectionState::CONNECTED)
     {
-        if (rx->value("from") == "server" && rx->value("uid") != m_serverUid)
+        if (rx.value("from") == "server" && rx.value("uid") != m_serverUid)
         {
             trace->warn("message from unknown server discarded");
             return;
         }
     }
 
-    if (rx->value("from") == m_name || ((rx->value("to") != m_name && rx->value("to") != "all")))
+    if (rx.value("from") == m_id || ((rx.value("to") != m_id && rx.value("to") != "all")))
     {
         return;
     }
 
     if (m_connectionState == ConnectionState::NOT_CONNECTED)
     {
-        if (rx->value("command") == "serveraddress")
+        if (rx.value("command") == "serveraddress")
         {
             m_connectionState = ConnectionState::CONNECTING;
-            m_serverUid = rx->value("uid");
-            QHostAddress address(rx->value("tcpaddress"));
-            uint16_t port = rx->value("tcpport").toUShort();
+            m_serverUid = rx.value("uid");
+            QHostAddress address(rx.value("tcpaddress"));
+            uint16_t port = rx.value("tcpport").toUShort();
             startTcpClient(address, port);
             reconnectTimer(false);
         }
@@ -228,16 +229,16 @@ void Client::multicastRx(MulticastRxPacketPtr rx)
         m_serverAlive = true;
     }
 
-    if (rx->value("command") == "control")
+    if (rx.value("command") == "control")
     {
         executeControl(rx);
     }
 }
 
 
-void Client::executeControl(MulticastRxPacketPtr rx)
+void Client::executeControl(const MulticastRxPacket& rx)
 {
-    std::string action = rx->value("action").toStdString();
+    std::string action = rx.value("action").toStdString();
     trace->info("got control command {}", action);
 
     if (action == "kill")
@@ -247,12 +248,12 @@ void Client::executeControl(MulticastRxPacketPtr rx)
     }
     else if (action == "developmentmask")
     {
-        g_developmentMask = (DevelopmentMask) rx->value("developmentmask").toInt();
+        g_developmentMask = (DevelopmentMask) rx.value("developmentmask").toInt();
     }
     else if (action == "vctcxodac")
     {
 #ifdef VCTCXO
-        QString value = rx->value("value");
+        QString value = rx.value("value");
         if (value == "auto")
         {
             trace->info("setting vctcxo to auto");
@@ -266,7 +267,7 @@ void Client::executeControl(MulticastRxPacketPtr rx)
             trace->info("setting vctcxo to fixed value {} (0x{:04x})", dac, dac);
         }
 #else
-        trace->error("running in standalone mode, there is no dac here");
+        trace->error("running in software mode, there is no dac here");
 #endif
     }
     else
@@ -299,8 +300,6 @@ void Client::udpRx()
         m_udpSocket->receiveDatagram();
         m_udpOverruns++;
     }
-
-    usleep(1000);
 
     sendLocalTimeUDP();
 }
@@ -402,8 +401,8 @@ void Client::tcpRx()
             {
                 int64_t wall_offset = rx.value("wall_clock").toLongLong();
 
-                s_systemTime->setWallclock(s_systemTime->getRawSystemTime() + wall_offset);
-                trace->info("adjusting wallclock to {}", s_systemTime->getWallClock());
+                s_systemTime->setWallclock_ns(s_systemTime->getRawSystemTime() + wall_offset);
+                trace->info("adjusting wallclock to {}", SystemTime::getWallClock_ns());
             }
             m_offsetMeasurementHistory.reset();
         }
@@ -418,7 +417,7 @@ void Client::tcpRx()
         else if (command == "adjustwallclock")
         {
             int64_t offset_ns = rx.value("offset_ns").toLongLong();
-            s_systemTime->setWallclock(s_systemTime->getWallClock() - offset_ns);
+            s_systemTime->setWallclock_ns(SystemTime::getWallClock_ns() - offset_ns);
         }
         else
         {
@@ -463,7 +462,7 @@ void Client::adjustPPM(double ppm)
             return;
         }
 
-        std::string extras = "";
+        std::string extras;
 
         // Local detection of a stable time lock. A stable time lock is the criteria for
         // saving a new updated default dac to file. Note that the server currently have
@@ -590,7 +589,7 @@ void Client::sendServerConnectRequest()
 {
     trace->trace("sending connection request");
     QJsonObject json;
-    json["from"] = m_name;
+    json["from"] = m_id;
     json["to"] = "server";
     json["command"] = "connect";
     json["endpoint"] = Interface::getLocalAddress().toString();

@@ -72,6 +72,15 @@ Control::Control(QCoreApplication *parent, QCommandLineParser& parser, const QHo
     {
         development_mask = (DevelopmentMask) (development_mask | DevelopmentMask::SaveClientSummaryLines);
     }
+    if (parser.isSet("summaryonbailingout"))
+    {
+        development_mask = (DevelopmentMask) (development_mask | DevelopmentMask::OnBailingOut);
+    }
+    if (parser.isSet("sampleperiodsweep"))
+    {
+        development_mask = (DevelopmentMask) (development_mask | DevelopmentMask::SamplePeriodSweep);
+    }
+
     if (development_mask != DevelopmentMask::None)
     {
         MulticastTxPacket tx(KeyVal{

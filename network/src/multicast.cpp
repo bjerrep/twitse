@@ -7,7 +7,7 @@
 #include <iostream>
 
 
-Multicast::Multicast(QString id, const QHostAddress& address, uint16_t port)
+Multicast::Multicast(const QString& id, const QHostAddress& address, uint16_t port)
     : m_id(id),
       m_hostAddress(address),
       m_port(port)
@@ -42,7 +42,8 @@ void Multicast::slotMulticastRx()
         QByteArray datagram;
         datagram.resize(m_multicastSocket->pendingDatagramSize());
         m_multicastSocket->readDatagram(datagram.data(), datagram.size());
-        MulticastRxPacketPtr received = MulticastRxPacketPtr(new MulticastRxPacket(datagram));
+        qRegisterMetaType<MulticastRxPacket>("MulticastRxPacket");
+        auto received = MulticastRxPacket(datagram);
         emit rx(received);
     }
 }

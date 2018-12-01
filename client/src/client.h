@@ -24,7 +24,7 @@ class Client : public QObject
 
 public:
 
-    Client(QCoreApplication *parent, QString name,
+    Client(QCoreApplication *parent, const QString &name,
            const QHostAddress &address, uint16_t port,
            spdlog::level::level_enum loglevel,
            bool clockadj, bool autoPPM_LSB, double fixedPPM_LSB);
@@ -50,19 +50,19 @@ private:
     void sendLocalTimeUDP();
     bool processIsTracking() const;
     bool processIsLocked() const;
-    void executeControl(MulticastRxPacketPtr rx);
+    void executeControl(const MulticastRxPacket& rx);
 
     void timerEvent(QTimerEvent *);
 
 private slots:
     void connected();
-    void multicastRx(MulticastRxPacketPtr rx);
+    void multicastRx(const MulticastRxPacket& rx);
     void tcpRx();
     void udpRx();
 
 private:
     QCoreApplication* m_parent;
-    QString m_name;
+    QString m_id;
     spdlog::level::level_enum m_logLevel;
     bool m_autoPPMAdjust = true;
     bool m_noClockAdj;
@@ -73,7 +73,7 @@ private:
     QTcpSocket m_tcpSocket;
     QUdpSocket* m_udpSocket = nullptr;
     QHostAddress m_serverAddress;
-    uint16_t m_serverTcpPort;
+    uint16_t m_serverTcpPort = 0;
     QByteArray m_tcpReadBuffer;
     int m_udpOverruns = 0;
 

@@ -3,10 +3,15 @@
 
 #include <QFile>
 #include <QTextStream>
+#include <QRegularExpression>
 
-void DataFiles::dumpVectors(QString name, int loop, const SampleList64 *a, const SampleList64 *b, SampleList64 *c, SampleList64 *d)
+void DataFiles::dumpVectors(QString name, int serial,
+                            const SampleList64 *a,
+                            const SampleList64 *b,
+                            const SampleList64 *c,
+                            const SampleList64 *d)
 {
-    name += "_" + QString::number(loop) + ".data";
+    name += "_" + QString::number(serial) + ".data";
     trace->info("dumping data to {}", name.toStdString());
     QFile file(name);
     if (file.open(QIODevice::WriteOnly))
@@ -84,11 +89,15 @@ void DataFiles::fileApp(QString name, int64_t val, bool newline)
 
 void DataFiles::fileApp(const std::string& name, const std::string& message)
 {
+    const auto re = QRegularExpression { "\\x1B\\[.*?m" };
+    QString no_ansi_colors(message.c_str());
+    no_ansi_colors.replace(re, "");
+
     QFile file(QString::fromStdString(name));
     if (file.open(QIODevice::WriteOnly | QIODevice::Append))
     {
         QTextStream stream(&file);
-        stream << QString::fromStdString(message);
+        stream << no_ansi_colors;
         stream << endl;
     }
 }

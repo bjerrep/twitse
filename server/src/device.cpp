@@ -18,9 +18,9 @@
 
 
 extern DevelopmentMask g_developmentMask;
+extern int g_randomTrashPromille;
 
-
-Device::Device(QObject* parent, const QString& clientName, const QHostAddress& address)
+Device::Device(QObject* parent, const QString& clientName)
     : QObject(parent),
       m_name(clientName),
       m_server(new QTcpServer(this)),
@@ -74,6 +74,15 @@ Device::~Device()
 
 void Device::sendServerTimeUDP()
 {
+    if (g_randomTrashPromille)
+    {
+        if (qrand() % 1000 <= g_randomTrashPromille)
+        {
+            // what amounts to a missing packet on the client
+            return;
+        }
+    }
+
     int64_t epoch = s_systemTime->getUpdatedSystemTime();
     m_udp->writeDatagram((const char *) &epoch, sizeof(int64_t), m_clientAddress, m_clientTcpPort);
     m_clientPingCounter = g_serverPingPeriod / 500;
@@ -91,10 +100,6 @@ void Device::processMeasurement(const RxPacket& rx)
 {
     OffsetMeasurement measurement = m_measurementSeries->calculate();
 
-    m_statusReport.newMeasurement(m_lock.getNofSamples(),
-                                  measurement.m_collectedSamples,
-                                  measurement.m_usedSamples);
-
     trace->debug("{}{}", getLogName(), measurement.toString());
 
     int64_t server2client_ns = rx.value("offset").toLongLong();
@@ -109,6 +114,24 @@ void Device::processMeasurement(const RxPacket& rx)
     // the central offset from a measurement series
     int64_t clientoffset_ns = (client2server_ns - server2client_ns) / 2;
 
+    if (m_fixedSamplePeriod_ms > 0)
+    {
+        clientoffset_ns = 0;
+    }
+
+    // history
+
+    if (m_fixedSamplePeriod_ms > 0)
+    {
+        trace->info("SamplePeriodSweep, saving raw measurement");
+        m_measurementSeries->saveRawMeasurements(
+                    fmt::format("sample_period_sweep_{}", name()), m_fixedSamplePeriod_ms);
+    }
+
+    m_statusReport.newMeasurement(m_lock.getNofSamples(),
+                                  measurement.m_collectedSamples,
+                                  measurement.m_usedSamples);
+
     measurement.setOffset_ns(clientoffset_ns);
     m_offsetMeasurementHistory->add(measurement);
 
@@ -116,9 +139,16 @@ void Device::processMeasurement(const RxPacket& rx)
 
     bool valid = true;
 
+    if (m_fixedSamplePeriod_ms > 0)
+    {
+        clientoffset_ns = 0.0;
+        roundtrip_ms = 1.0;
+    }
+
     if (!(g_developmentMask & DevelopmentMask::SameHost) and (roundtrip_ms < 0.7 or roundtrip_ms > 5.0))
     {
-        trace->critical("{}either system times are invalid or network is useless, roundtrip is {:.3f} msecs. Aborting", getLogName(), roundtrip_ms);
+        trace->critical("{}either system times are invalid or network is useless, roundtrip is {:.3f} msecs. Aborting",
+                        getLogName(), roundtrip_ms);
         valid = false;
     }
 
@@ -126,12 +156,13 @@ void Device::processMeasurement(const RxPacket& rx)
     {
         if (roundtrip_us / m_avgRoundtrip_us > 2.0)
         {
-            trace->critical("{}roundtrip jumped from average {:.3f} to {:.3f} msecs. Aborting", m_avgRoundtrip_us/1000.0, getLogName(), roundtrip_ms);
+            trace->critical("{}roundtrip jumped from average {:.3f} to {:.3f} msecs. Aborting",
+                            getLogName(), m_avgRoundtrip_us/1000.0, roundtrip_ms);
             valid = false;
         }
     }
 
-    if (!valid)
+    if (!valid && (m_fixedSamplePeriod_ms < 0))
     {
         sampleRunComplete();
         m_lock.panic();
@@ -163,11 +194,11 @@ void Device::processMeasurement(const RxPacket& rx)
 
     if (m_initState == InitState::RUNNING && m_offsetMeasurementHistory->size() > 1)
     {
-        // experimental constants.
+        // experimental constants galore.
 #ifdef VCTCXO
         const double magicnumber_zero = 300;
-        const double magicnumber_antislope = 7; // 7;
-        const double magicnumber_hilock_throttle = 1.25; //1.0;
+        const double magicnumber_antislope = 8;
+        const double magicnumber_hilock_throttle = 1.25;
         const double magicnumber_lock_throttle = 1.25;
 #else
         const double magicnumber_zero = 800;
@@ -182,7 +213,7 @@ void Device::processMeasurement(const RxPacket& rx)
 
         double ppm = offset_ppm + levelling_ppm;
 
-        m_lock.errorOffset(clientoffset_us);
+        m_lock.update(clientoffset_us);
 
         if (m_lock.isHiLock())
         {
@@ -226,7 +257,7 @@ void Device::processMeasurement(const RxPacket& rx)
                 getLogName(), m_offsetMeasurementHistory->getCounter(), s_systemTime->getRunningTime_secs(),
                 roundtrip_us,
                 m_offsetMeasurementHistory->getSD_us(),
-                m_lock.getMeasurementPeriodsecs(), m_lock.getInterMeasurementDelaySecs(), m_lock.getNofSamples(),
+                m_lock.getMeasurementPeriod_sec(), m_lock.getInterMeasurementDelaySecs(), m_lock.getNofSamples(),
                 m_avgClientOffset,
                 clientoffset_us,
                 extra);
@@ -235,7 +266,7 @@ void Device::processMeasurement(const RxPacket& rx)
 
     if (g_developmentMask & DevelopmentMask::SaveClientSummaryLines)
     {
-        std::string filename = fmt::format("raw_{}_client_summary.data", name());
+        std::string filename = fmt::format("/tmp/raw_{}_client_summary.data", name());
         trace->info("dumping {}", filename);
         DataFiles::fileApp(filename, message);
     }
@@ -277,7 +308,7 @@ void Device::processMeasurement(const RxPacket& rx)
             int64_t wall_offset = 0;
             for (int i = 0; i < 100; ++i)
             {
-                wall_offset += s_systemTime->getWallClock() - s_systemTime->getRawSystemTime();
+                wall_offset += SystemTime::getWallClock_ns() - s_systemTime->getRawSystemTime();
             }
             wall_offset /= 100;
             json["wall_offset"] = QString::number(wall_offset);
@@ -285,16 +316,31 @@ void Device::processMeasurement(const RxPacket& rx)
 
         tcpTx(json);
 
-        trace->info("{}adjusting client system time with {} ns and setting ppm to {:7.3f}", getLogName(), client_adjustment_ns, ppm);
+        trace->info("{}adjusting client system time with {} ns and setting ppm to {:7.3f}",
+                    getLogName(), client_adjustment_ns, ppm);
 
         m_offsetMeasurementHistory->reset();
-        //m_offsetMeasurementHistory->enableAverages();
-
         m_initState = InitState::RUNNING;
     }
     else
     {
         sampleRunComplete();
+    }
+
+    if (develPeriodSweep)
+    {
+        if (m_fixedSamplePeriod_ms < 0)
+        {
+            m_lock.setFixedSamplePeriod_ms(3);
+            Lock::setFixedMeasurementSilence_sec(0);
+            Lock::setFixedClientSamples(500);
+            m_measurementSeries->setFiltering(MeasurementSeriesBase::EVERYTHING);
+            m_fixedSamplePeriod_ms = 3;
+        }
+        else
+        {
+            m_lock.setFixedSamplePeriod_ms(++m_fixedSamplePeriod_ms);
+        }
     }
 
     QJsonObject json;
@@ -331,7 +377,7 @@ void Device::timerEvent(QTimerEvent* event)
         killTimer(m_sampleRunTimer);
         m_sampleRunTimer = TIMEROFF;
 
-        prepareSampleRun();
+        measurementStart();
     }
 }
 
@@ -418,7 +464,7 @@ void Device::slotTcpRx()
 
             if (delay == 0 )
             {
-                prepareSampleRun();
+                measurementStart();
             }
             else
             {
@@ -467,6 +513,15 @@ void Device::slotUdpRx()
     int64_t localTime = s_systemTime->getUpdatedSystemTime();
     int64_t clientTime = *((int64_t*) m_udp->receiveDatagram().data().data());
 
+    if (g_randomTrashPromille)
+    {
+        if (qrand() % 1000 <= g_randomTrashPromille)
+        {
+            // loose the client answer
+            return;
+        }
+    }
+
     processTimeSample(clientTime, localTime);
     m_statusReport.packetSentOrReceived();
 
@@ -504,7 +559,7 @@ std::string Device::getStatusReport()
 }
 
 
-void Device::prepareSampleRun()
+void Device::measurementStart()
 {
     int count = m_lock.getNofSamples();
 
@@ -514,8 +569,8 @@ void Device::prepareSampleRun()
     tcpTx(json);
 
     trace->debug("{}starting sample run with {} samples and period_ms {} (slept {} secs)",
-                 getLogName(), count, m_lock.getPeriodMSecs(), m_lock.getInterMeasurementDelaySecs());
-    emit signalRequestSamples(m_name, count, m_lock.getPeriodMSecs());
+                 getLogName(), count, m_lock.getSamplePeriod_ms(), m_lock.getInterMeasurementDelaySecs());
+    emit signalRequestSamples(m_name, count, m_lock.getSamplePeriod_ms());
 }
 
 

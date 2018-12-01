@@ -9,7 +9,6 @@ class ClientSampleRun
 {
 public:
     ClientSampleRun(const QString& client, int count);
-    ~ClientSampleRun();
 
     QString m_name;
     int m_count = 0;
@@ -22,8 +21,6 @@ class Samples : public QObject
     Q_OBJECT
 
 public:
-    Samples();
-
     void setPeriod(int period_ms);
     void timerEvent(QTimerEvent*);
     void removeClient(const QString &clientname);

@@ -82,8 +82,8 @@ public:
 #endif
     }
     
-    static int64_t getWallClock();
-    void setWallclock(int64_t epoch);
+    static int64_t getWallClock_ns();
+    void setWallclock_ns(int64_t epoch);
 
     void adjustSystemTime_ns(int64_t adjustment_ns);
 

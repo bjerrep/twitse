@@ -32,7 +32,7 @@ DataAnalyse::DataAnalyse(MeasurementSeriesBase* server_calc,
             dataset samples = load(clientfiles.at(i));
             client_calc->prepareNewDataMeasurement();
 
-            for (dataline datas : samples)
+            for (const dataline& datas : samples)
             {
                 client_calc->add(datas.at(0), datas.at(1));
             }
@@ -45,7 +45,7 @@ DataAnalyse::DataAnalyse(MeasurementSeriesBase* server_calc,
             dataset samples = load(serverfiles.at(i));
             server_calc->prepareNewDataMeasurement();
 
-            for (dataline datas : samples)
+            for (const dataline& datas : samples)
             {
                 server_calc->add(datas.at(0), datas.at(1));
             }
@@ -78,9 +78,10 @@ DataAnalyse::DataAnalyse(MeasurementSeriesBase* server_calc,
     }
 
     int64_t avg = MathFunc::average(delta_offset_ns);
-    for (uint i = 0; i < delta_offset_ns.size(); i++)
+
+    for (auto delta_offset : delta_offset_ns)
     {
-        delta_offset_ns[i] -= avg;
+        delta_offset -= avg;
     }
 
     trace->info("standard deviation from delta server offsets {} us",
@@ -96,7 +97,7 @@ dataset DataAnalyse::load(const QString& filename)
     QByteArray ba = file.readAll();
     QStringList content = QString(ba).split("\n");
 
-    for (QString line : content)
+    for (const QString& line : content)
     {
         if (line.isEmpty())
             break;

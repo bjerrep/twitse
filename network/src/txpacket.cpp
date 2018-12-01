@@ -5,12 +5,7 @@
 #include <QDataStream>
 #include <QMap>
 #include <QVector>
-#include <time.h>
-
-
-UdpTxPacket::UdpTxPacket()
-{
-}
+#include <ctime>
 
 
 QString UdpTxPacket::toString() const
@@ -55,13 +50,6 @@ void TcpTxPacket::setValue(const QString &key, const QString &value)
 
 QByteArray TcpTxPacket::getData(bool serialize)
 {
-#ifdef TRACE_TCP_COMMANDS
-    if (m_json["command"].toString() != "ping")
-    {
-        trace->debug("tcptx -> '{}'", m_json["command"].toString().toStdString());
-    }
-#endif
-
     QJsonDocument doc(m_json);
     QByteArray tx = doc.toJson();
 
@@ -95,7 +83,7 @@ MulticastTxPacket::MulticastTxPacket(const QString &command)
 
 MulticastTxPacket::MulticastTxPacket(const QMap<QString, QString> &keyValues)
 {
-    for (auto kv : keyValues.toStdMap())
+    for (const auto& kv : keyValues.toStdMap())
     {
         setValue(kv.first, kv.second);
     }

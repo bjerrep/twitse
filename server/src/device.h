@@ -81,7 +81,7 @@ class Device : public QObject
     Q_OBJECT
 
 public:
-    Device(QObject *parent, const QString& name, const QHostAddress & address = QHostAddress::Any);
+    Device(QObject *parent, const QString& name);
     ~Device();
 
     void tcpTx(const QJsonObject& json);
@@ -91,7 +91,7 @@ public:
     void processMeasurement(const RxPacket &rx);
 
     std::string name() const;
-    void prepareSampleRun();
+    void measurementStart();
     void getClientOffset();
     std::string getStatusReport();
 
@@ -135,7 +135,7 @@ public:
     OffsetMeasurementHistory* m_offsetMeasurementHistory;
     double m_avgRoundtrip_us = 0.0;
     int m_udpOverruns = 0;
-    int m_initStateCounter = 3;
+    int m_initStateCounter = NOF_INITIAL_PPM_MEASUREMENTS;
     InitState m_initState = InitState::PPM_MEASUREMENTS;
     bool m_averagesInitialized = false;
     double m_avgClientOffset = 0.0;
@@ -144,4 +144,6 @@ public:
     StatusReport m_statusReport;
     bool m_clientConnected = false;
     bool m_clientActive = false;
+
+    int m_fixedSamplePeriod_ms = -1;
 };

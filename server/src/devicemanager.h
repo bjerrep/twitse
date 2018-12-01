@@ -18,7 +18,7 @@ class DeviceManager : public QObject
 public:
     DeviceManager();
 
-    void process(const MulticastRxPacketPtr rx);
+    void process(const MulticastRxPacket& rx);
     Device* findDevice(const QString &name);
     const DeviceDeque& getDevices() const;
     bool activeClients() const;
@@ -30,7 +30,7 @@ signals:
 
 public slots:
     void slotSendTimeSample(const QString &client);
-    void slotSampleRunStatusUpdate(QString client, bool active);
+    void slotSampleRunStatusUpdate(const QString &client, bool active);
     void slotConnectionLost(const QString &client);
     void slotWebsocketTransmit(const QJsonObject& json);
     void slotNewWebsocketConnection();

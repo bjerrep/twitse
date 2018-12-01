@@ -16,12 +16,12 @@ class Multicast : public QObject
     Q_OBJECT
 
 public:
-    Multicast(QString id, const QHostAddress &address, uint16_t port);
+    Multicast(const QString &id, const QHostAddress &address, uint16_t port);
 
     void tx(MulticastTxPacket &tx);
 
 signals:
-    void rx(MulticastRxPacketPtr rx);
+    void rx(const MulticastRxPacket& rx);
 
 public slots:
     void slotMulticastRx();

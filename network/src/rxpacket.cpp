@@ -4,13 +4,13 @@
 #include <QJsonDocument>
 #include <QDataStream>
 #include <QJsonObject>
-#include <time.h>
+#include <ctime>
 
 
 UdpRxPacket::UdpRxPacket(QByteArray& data, int64_t localTime)
     : m_localTime(localTime)
 {
-    m_remoteTime = *(reinterpret_cast<int64_t*>(data.data()));
+    m_remoteTime = *((int64_t*)(data.data()));
 }
 
 
@@ -24,14 +24,6 @@ RxPacket::RxPacket(QByteArray& deserializedjson)
 {
     QJsonDocument doc(QJsonDocument::fromJson(deserializedjson));
     m_json = new QJsonObject(doc.object());
-
-#ifdef TRACE_TCP_COMMANDS
-    QString command = m_json->value("command").toString();
-    if (command != "ping")
-    {
-        trace->debug("tcprx <- '{}'", command.toStdString());
-    }
-#endif
 }
 
 
@@ -62,12 +54,6 @@ MulticastRxPacket::MulticastRxPacket(QByteArray& deserializedjson)
 {
     QJsonDocument doc(QJsonDocument::fromJson(deserializedjson));
     m_json = new QJsonObject(doc.object());
-}
-
-
-MulticastRxPacket::~MulticastRxPacket()
-{
-    delete m_json;
 }
 
 

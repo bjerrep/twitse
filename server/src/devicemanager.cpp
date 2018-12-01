@@ -37,7 +37,7 @@ const DeviceDeque &DeviceManager::getDevices() const
 
 bool DeviceManager::activeClients() const
 {
-    return m_activeClients.size();
+    return !m_activeClients.empty();
 }
 
 
@@ -51,17 +51,17 @@ bool DeviceManager::allDevicesInRunningState() const
         }
     }
     return true;
-
 }
 
-void DeviceManager::process(const MulticastRxPacketPtr rx)
+
+void DeviceManager::process(const MulticastRxPacket& rx)
 {
-    QString from = rx->value("from");
-    QString command = rx->value("command");
+    QString from = rx.value("from");
+    QString command = rx.value("command");
 
     if (command == "connect")
     {
-        trace->info("[{:<8}] connection request on {}", from.toStdString(), rx->value("endpoint").toStdString());
+        trace->info("[{:<8}] connection request on {}", from.toStdString(), rx.value("endpoint").toStdString());
         if (findDevice(from))
         {
             trace->warn("[{:<8}] already registered - connection request ignored", from.toStdString());
@@ -72,7 +72,7 @@ void DeviceManager::process(const MulticastRxPacketPtr rx)
 
         connect(newDevice, &Device::signalRequestSamples, &m_samples, &Samples::slotRequestSamples);
         connect(newDevice, &Device::signalConnectionLost, this, &DeviceManager::slotConnectionLost);
-        connect(newDevice, &Device::signalNewOffsetMeasurement, m_webSocket, &WebSocket::slotSendOffsetMeasurement);
+        connect(newDevice, &Device::signalNewOffsetMeasurement, m_webSocket, &WebSocket::slotNewOffsetMeasurement);
         connect(newDevice, &Device::signalWebsocketTransmit, m_webSocket, &WebSocket::slotTransmit);
         connect(m_webSocket, &WebSocket::signalNewWebsocketConnection, this, &DeviceManager::slotNewWebsocketConnection);
 
@@ -101,7 +101,7 @@ void DeviceManager::slotSendTimeSample(const QString& client)
 }
 
 
-void DeviceManager::slotSampleRunStatusUpdate(QString client, bool active)
+void DeviceManager::slotSampleRunStatusUpdate(const QString& client, bool active)
 {
     if (active)
     {

@@ -46,9 +46,9 @@ double SystemTime::getRunningTime_secs()
 }
 
 
-void SystemTime::setWallclock(int64_t epoch)
+void SystemTime::setWallclock_ns(int64_t epoch)
 {
-    trace->critical("This is wrong. setWallclock is only implemented for VCTCXO mode");
+    trace->critical("This is wrong. setWallclock_ns is only implemented for VCTCXO mode");
 }
 
 

@@ -27,16 +27,20 @@ const int g_clientReconnectPeriod = 3000;
 
 const int g_statusReport = 120000;
 
-static const int TIMEROFF = -1;
+const int TIMEROFF = -1;
 const int TIMER_20MS = 20;
 const int TIMER_1SEC = 1000;
 const int TIMER_10SECS = 10 * 1000;
 const int TIMER_5MIN = 5 * 60 * 1000;
 
-static const int64_t NS_IN_SEC = 1000000000LL;
-static const int64_t NS_IN_MSEC = 1000000LL;
+const int64_t NS_IN_SEC = 1000000000LL;
+const int64_t NS_IN_MSEC = 1000000LL;
 static constexpr double NS_IN_SEC_F = 1000000000.0;
 static constexpr double NS_IN_MSEC_F = 1000000.0;
+const int64_t MSEC_IN_HOUR = 1000 * 60 * 60;
+const int64_t HOURS_IN_WEEK = 24 * 7;
+
+const int NOF_INITIAL_PPM_MEASUREMENTS = 3;
 
 enum DevelopmentMask
 {
@@ -46,7 +50,9 @@ enum DevelopmentMask
     AnalysisAppendToSummary     = 0x04,
     SaveMeasurements            = 0x08,
     SaveClientSummaryLines      = 0x10,
-    TurboMeasurements           = 0x20
+    TurboMeasurements           = 0x20,
+    SamplePeriodSweep           = 0x40
 };
 
-// #define TRACE_TCP_COMMANDS
+#define develTurbo (g_developmentMask & DevelopmentMask::TurboMeasurements)
+#define develPeriodSweep (g_developmentMask & DevelopmentMask::SamplePeriodSweep)

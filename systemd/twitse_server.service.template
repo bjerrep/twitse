@@ -7,7 +7,7 @@ After=time-sync.target
 Type=simple
 User=root
 WorkingDirectory=<git root>
-ExecStart=<git root>/bin/server
+ExecStart=<git root>/bin/twitse_server
 Restart=on-failure
 
 [Install]

@@ -12,7 +12,7 @@ class RxPacket
 public:
     RxPacket() {}
     RxPacket(QByteArray &deserializedjson);
-    ~RxPacket();
+    virtual ~RxPacket();
 
     virtual QString toString() const;
     QString value(const QString& key) const;
@@ -27,7 +27,7 @@ class MulticastRxPacket
 public:
     MulticastRxPacket() {}
     MulticastRxPacket(QByteArray &deserializedjson);
-    ~MulticastRxPacket();
+    virtual ~MulticastRxPacket() = default;
 
     virtual QString toString() const;
     QString value(const QString& key) const;
@@ -51,9 +51,7 @@ private:
 };
 
 using UdpRxPacketPtr = QSharedPointer<UdpRxPacket>;
-using MulticastRxPacketPtr = QSharedPointer<MulticastRxPacket>;
 using TcpRxPacketPtr = QSharedPointer<RxPacket>;
 
 Q_DECLARE_METATYPE(UdpRxPacketPtr)
 Q_DECLARE_METATYPE(TcpRxPacketPtr)
-Q_DECLARE_METATYPE(MulticastRxPacketPtr)

@@ -29,15 +29,16 @@ Server::Server(QCoreApplication *parent, const QHostAddress &address, uint16_t p
 
     qRegisterMetaType<UdpRxPacketPtr>("UdpRxPacketPtr");
     qRegisterMetaType<TcpRxPacketPtr>("TcpRxPacketPtr");
-    qRegisterMetaType<MulticastRxPacketPtr>("MulticastRxPacketPtr");
+    qRegisterMetaType<MulticastRxPacket>("MulticastRxPacket");
 
     s_systemTime->reset();
 
     if (VCTCXO_MODE)
     {
-        int64_t m_previousRealtimeDiff = s_systemTime->getWallClock() - s_systemTime->getRawSystemTime();
+        int64_t m_previousRealtimeDiff = SystemTime::getWallClock_ns() - s_systemTime->getRawSystemTime();
         s_systemTime->adjustSystemTime_ns(m_previousRealtimeDiff);
-        m_softPPMColdstartTimer = startTimer(15 * TIMER_1SEC);
+        int seconds = develTurbo ? 2 : 15;
+        m_softPPMColdstartTimer = startTimer(seconds * TIMER_1SEC);
         m_softPPMPrevAdjustTime = s_systemTime->getRawSystemTime();
         trace->info("wait while establishing wall clock drift relative to raw clock (15sec...)");
     }
@@ -45,11 +46,6 @@ Server::Server(QCoreApplication *parent, const QHostAddress &address, uint16_t p
     {
         startServer();
     }
-}
-
-
-Server::~Server()
-{
 }
 
 
@@ -68,14 +64,14 @@ void Server::startServer()
 }
 
 
-void Server::multicastRx(MulticastRxPacketPtr rx)
+void Server::multicastRx(const MulticastRxPacket &rx)
 {
-    if (rx->value("from") == "server"  || ((rx->value("to") != "server" && rx->value("to") != "all")))
+    if (rx.value("from") == "server"  || ((rx.value("to") != "server" && rx.value("to") != "all")))
     {
         return;
     }
 
-    if (rx->value("command") == "control")
+    if (rx.value("command") == "control")
     {
         executeControl(rx);
     }
@@ -86,9 +82,9 @@ void Server::multicastRx(MulticastRxPacketPtr rx)
 }
 
 
-void Server::executeControl(MulticastRxPacketPtr rx)
+void Server::executeControl(const MulticastRxPacket& rx)
 {
-    std::string action = rx->value("action").toStdString();
+    std::string action = rx.value("action").toStdString();
     trace->info("got control command {}", action);
 
     if (action == "kill")
@@ -98,17 +94,17 @@ void Server::executeControl(MulticastRxPacketPtr rx)
     }
     else if (action == "developmentmask")
     {
-        g_developmentMask = (DevelopmentMask) rx->value("developmentmask").toInt();
+        g_developmentMask = (DevelopmentMask) rx.value("developmentmask").toInt();
     }
     else if (action == "silence")
     {
-        trace->info("setting period to {}", rx->value("value").toStdString());
-        Lock::setClientPeriod(rx->value("value") == "auto" ? -1 : rx->value("value").toInt());
+        trace->info("setting period to {}", rx.value("value").toStdString());
+        Lock::setFixedMeasurementSilence_sec(rx.value("value") == "auto" ? -1 : rx.value("value").toInt());
     }
     else if (action == "samples")
     {
-        trace->info("setting samples to {}", rx->value("value").toStdString());
-        Lock::setClientSamples(rx->value("value") == "auto" ? -1 : rx->value("value").toInt());
+        trace->info("setting samples to {}", rx.value("value").toStdString());
+        Lock::setFixedClientSamples(rx.value("value") == "auto" ? -1 : rx.value("value").toInt());
     }
     else
     {
@@ -170,7 +166,7 @@ void Server::adjustRealtimeSoftPPM()
     m_softPPMPrevAdjustTime = now;
 
     // Find current deviation between the raw and wall clock and express it as a drift in ppm
-    double diff_sec = (s_systemTime->getRawSystemTime() - s_systemTime->getWallClock()) / NS_IN_SEC_F;
+    double diff_sec = (s_systemTime->getRawSystemTime() - SystemTime::getWallClock_ns()) / NS_IN_SEC_F;
     // This ppm value reflects what needs to be done, its negative if the raw time is running too fast
     double ppm = - (1000000.0 * (diff_sec - m_softPPMPreviousDiff)) / elapsed;
 
@@ -215,8 +211,12 @@ void Server::adjustRealtimeSoftPPM()
 
     s_systemTime->setPPM(adjustment);
 
-    trace->info("wall clock to raw clock skew is {:.6f} secs -> ppm {:.3f}. Adjusting with {:.6f} to {:.3f} ppm",
-                diff_sec, ppm, adjustment, s_systemTime->getPPM());
+    const int period_min = 15;
+    if (m_softPPMLogMessagePrescaler++ % ((60 / m_softPPMAdjustPeriodSecs) * period_min) == 0)
+    {
+        trace->info("wall clock to raw clock skew is {:.6f} secs -> ppm {:.3f}. Adjusting with {:.6f} to {:.3f} ppm",
+                    diff_sec, ppm, adjustment, s_systemTime->getPPM());
+    }
 }
 
 

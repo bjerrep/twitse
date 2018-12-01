@@ -3,7 +3,7 @@
 
 extern DevelopmentMask g_developmentMask;
 
-int Lock::s_clientPeriod = -1;
+int Lock::s_fixedMeasurementSilence_sec = -1;
 int Lock::s_clientSamples = -1;
 
 
@@ -43,45 +43,61 @@ int Lock::getInterMeasurementDelaySecs() const
     case EVENLY_DISTRIBUTED:
         return 0;
     case BURST_SILENCE:
-        if (s_clientPeriod >= 0)
-            return s_clientPeriod;
-        return getMeasurementPeriodsecs() - getNofSamples() * getPeriodMSecs() / 1000.0;
+        if (s_fixedMeasurementSilence_sec >= 0)
+        {
+            return s_fixedMeasurementSilence_sec;
+        }
+        return getMeasurementPeriod_sec() - getNofSamples() * getSamplePeriod_ms() / 1000.0;
     }
     return 0;
 }
 
 
-int Lock::getPeriodMSecs() const
+int Lock::getSamplePeriod_ms() const
 {
+    if (m_fixedSamplePeriod_ms >= 0)
+    {
+        return m_fixedSamplePeriod_ms;
+    }
+
     switch (m_distribution)
     {
     case EVENLY_DISTRIBUTED:
-        return 1000 * getMeasurementPeriodsecs() / getNofSamples();
+        return 1000 * getMeasurementPeriod_sec() / getNofSamples();
     case BURST_SILENCE:
         return MIN_SAMPLE_INTERVAL_ms;
     }
     return 0;
 }
 
-void Lock::setClientPeriod(int period)
+
+void Lock::setFixedMeasurementSilence_sec(int period)
 {
-    s_clientPeriod = period;
+    s_fixedMeasurementSilence_sec = period;
 }
 
 
-void Lock::setClientSamples(int samples)
+void Lock::setFixedClientSamples(int samples)
 {
     s_clientSamples = samples;
 }
 
 
-int Lock::getMeasurementPeriodsecs() const
+// development
+void Lock::setFixedSamplePeriod_ms(int ms)
+{
+    m_fixedSamplePeriod_ms = ms;
+    m_distribution = EVENLY_DISTRIBUTED;
+}
+
+
+int Lock::getMeasurementPeriod_sec() const
 {
     const int min_period = (m_maxSamples * MIN_SAMPLE_INTERVAL_ms) / 1000;
 
-    if (s_clientPeriod >= 0)
+    if (s_fixedMeasurementSilence_sec >= 0)
     {
-        return s_clientPeriod + min_period;
+        return s_fixedMeasurementSilence_sec + min_period;
     }
 
     if (m_quality < QUALITY_ACCEPT)
@@ -132,7 +148,7 @@ std::string Lock::toString(LockState state)
 }
 
 
-Lock::LockState Lock::errorOffset(double offset)
+Lock::LockState Lock::update(double offset)
 {
     LockState lockState = m_lockState;
     const int LOCK_COUNTS = 3;

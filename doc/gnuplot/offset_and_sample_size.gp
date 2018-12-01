@@ -12,7 +12,9 @@ set linestyle 2 lt 2 lw 1 pt 8
 
 DATAFILE=ARG1
 set term qt size 900, 400
-plot DATAFILE using 4:18 w lp t 'offset usec' axes x1y1, DATAFILE using 4:14 with imp ls 2 title 'sample size' axes x1y2
+
+# the column index "time:value" pairs probably need some adjusting to whatever todays format happen to be
+plot DATAFILE using 5:19 w lp t 'offset usec' axes x1y1, DATAFILE using 5:15 with imp ls 2 title 'sample size' axes x1y2
 pause mouse button1,keypress
 
 set term png size 900, 400

@@ -5,6 +5,8 @@
 #include "apputils.h"
 #include "globals.h"
 
+extern DevelopmentMask g_developmentMask;
+
 
 ClientSampleRun::ClientSampleRun(const QString &client, int count)
     : m_name(client),
@@ -13,17 +15,7 @@ ClientSampleRun::ClientSampleRun(const QString &client, int count)
     m_startTime = s_systemTime->getRunningTime_secs();
 }
 
-
-ClientSampleRun::~ClientSampleRun()
-{
-}
-
 // -------------------------------------------
-
-
-Samples::Samples()
-{
-}
 
 
 void Samples::setPeriod(int period_ms)
@@ -67,13 +59,16 @@ void Samples::timerEvent(QTimerEvent *)
     }
     else
     {
-        if (qrand() % 10 == 0)
+        if (!develPeriodSweep)
         {
-            int skewrange = m_period_ms / 2;
-            skewrange += !(skewrange % 2);
-            int skew = (qrand() % skewrange) - skewrange / 2;
-            timerOff(this, m_timerId, true);
-            m_timerId = startTimer(m_period_ms + skew, Qt::PreciseTimer);
+            if (qrand() % 10 == 0)
+            {
+                int skewrange = m_period_ms / 2;
+                skewrange += !(skewrange % 2);
+                int skew = (qrand() % skewrange) - skewrange / 2;
+                timerOff(this, m_timerId);
+                m_timerId = startTimer(m_period_ms + skew, Qt::PreciseTimer);
+            }
         }
     }
 }
@@ -102,10 +97,9 @@ void Samples::removeClient(const QString& clientname)
 void Samples::slotRequestSamples(const QString& clientname, int count, int period_ms)
 {
     m_period_ms = period_ms;
-    if (m_sampleRuns.size() == 0)
-    {
-        m_timerId = startTimer(m_period_ms, Qt::PreciseTimer);
-    }
+    timerOff(this, m_timerId);
+    m_timerId = startTimer(m_period_ms, Qt::PreciseTimer);
+
     m_sampleRuns.append(new ClientSampleRun(clientname, count));
     m_client_it = m_sampleRuns.begin();
     emit signalSampleRunStatusUpdate((*m_client_it)->m_name, true);

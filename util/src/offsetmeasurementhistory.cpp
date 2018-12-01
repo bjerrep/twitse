@@ -4,7 +4,7 @@
 #include "systemtime.h"
 
 #include <numeric>
-#include <math.h>
+#include <cmath>
 
 OffsetMeasurementHistory::OffsetMeasurementHistory(double minSeconds, int minMeasurements)
     : m_minSeconds(minSeconds),
@@ -93,8 +93,14 @@ void OffsetMeasurementHistory::update()
 
             if (m_initialize)
             {
-                m_initialize = false;
-                m_movingAverageOffset_ns = last_measurement.m_offset_ns;
+                if (!--m_initialize)
+                {
+                    m_movingAverageOffset_ns = last_measurement.m_offset_ns;
+                }
+                else
+                {
+                    m_movingAverageOffset_ns = 0.0;
+                }
             }
             else
             {
@@ -160,7 +166,7 @@ double OffsetMeasurementHistory::getTimeSpan_sec() const
 }
 
 
-int OffsetMeasurementHistory::size() const
+size_t OffsetMeasurementHistory::size() const
 {
     return m_offsetMeasurements.size();
 }
@@ -189,15 +195,13 @@ std::string OffsetMeasurementHistory::clientToString(uint16_t dac) const
                            getPPM(), m_averageSlope * 1000000.0, m_sd_ns/1000.0,
                            dac);
     }
-    else
-    {
-        return fmt::format("{:-3d} runtime {:5.1f} samples/used {}/{:4.1f}% secs/size {:5.1f}/{} "
-                           "offset_us {:-5.1f} avgoff_us {:-5.1f}"
-                           " ppm {:-7.3f} avgppm {:-7.3f} sd_us {:-5.1f} systimeppm {:-7.3f}",
-                           m_loop, s_systemTime->getRunningTime_secs(), m_totalMeasurements, package_loss,
-                           getTimeSpan_sec(), m_offsetMeasurements.size(),
-                           offset_us, m_movingAverageOffset_ns/1000.0,
-                           getPPM(), m_averageSlope * 1000000.0, m_sd_ns/1000.0,
-                           s_systemTime->getPPM());
-    }
+
+    return fmt::format("{:-3d} runtime {:5.1f} samples/used {}/{:4.1f}% secs/size {:5.1f}/{} "
+                       "offset_us {:-5.1f} avgoff_us {:-5.1f}"
+                       " ppm {:-7.3f} avgppm {:-7.3f} sd_us {:-5.1f} systimeppm {:-7.3f}",
+                       m_loop, s_systemTime->getRunningTime_secs(), m_totalMeasurements, package_loss,
+                       getTimeSpan_sec(), m_offsetMeasurements.size(),
+                       offset_us, m_movingAverageOffset_ns/1000.0,
+                       getPPM(), m_averageSlope * 1000000.0, m_sd_ns/1000.0,
+                       s_systemTime->getPPM());
 }

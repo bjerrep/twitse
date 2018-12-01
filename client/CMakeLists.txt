@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.12)
 
-project(client)
+project(twitse_client)
 
 find_package(Qt5Core)
 find_package(Qt5Network)

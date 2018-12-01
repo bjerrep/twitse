@@ -4,7 +4,7 @@
 #include "systemtime_vctcxo.h"
 #include "log.h"
 
-#include <time.h>
+#include <ctime>
 #include <sys/time.h>
 
 #include <QtGlobal>
@@ -31,7 +31,7 @@ double SystemTime::getRunningTime_secs()
 }
 
 
-int64_t SystemTime::getWallClock()
+int64_t SystemTime::getWallClock_ns()
 {
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
@@ -41,7 +41,7 @@ int64_t SystemTime::getWallClock()
 }
 
 
-void SystemTime::setWallclock(int64_t epoch)
+void SystemTime::setWallclock_ns(int64_t epoch)
 {
     struct timespec ts = {(__time_t) (epoch / NS_IN_SEC), (__syscall_slong_t) (epoch % NS_IN_SEC)};
     int err = clock_settime(CLOCK_REALTIME, &ts);
