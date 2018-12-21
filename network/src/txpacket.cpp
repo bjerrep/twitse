@@ -48,7 +48,7 @@ void TcpTxPacket::setValue(const QString &key, const QString &value)
 }
 
 
-QByteArray TcpTxPacket::getData(bool serialize)
+QByteArray TcpTxPacket::getData()
 {
     QJsonDocument doc(m_json);
     QByteArray tx = doc.toJson();
@@ -103,7 +103,7 @@ void MulticastTxPacket::setValue(const QString &key, const QString &value)
 }
 
 
-QByteArray MulticastTxPacket::getData(bool serialize)
+QByteArray MulticastTxPacket::getData()
 {
     QJsonDocument doc(m_json);
     return doc.toJson();

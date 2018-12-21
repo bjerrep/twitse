@@ -10,7 +10,7 @@
 
 std::shared_ptr<spdlog::logger> trace = spdlog::stdout_color_mt("console");
 
-DevelopmentMask g_developmentMask = DevelopmentMask::None;
+int g_developmentMask = DevelopmentMask::None;
 
 void signalHandler(int signal)
 {
@@ -106,5 +106,5 @@ int main(int argc, char *argv[])
 
     Client client(&app, id, address, port, loglevel, no_clock_adj, !use_fixed_adjust, fixed_adjust);
 
-    return app.exec();
+    return QCoreApplication::exec();
 }

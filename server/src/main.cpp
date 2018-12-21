@@ -11,7 +11,7 @@
 
 std::shared_ptr<spdlog::logger> trace = spdlog::stdout_color_mt("console");
 
-DevelopmentMask g_developmentMask = DevelopmentMask::None;
+int g_developmentMask = DevelopmentMask::None;
 int g_randomTrashPromille = 0;
 
 void signalHandler(int signal)
@@ -83,13 +83,13 @@ int main(int argc, char *argv[])
 
     if (parser.isSet("samehost"))
     {
-        g_developmentMask = (DevelopmentMask) (g_developmentMask | DevelopmentMask::SameHost);
+        g_developmentMask = g_developmentMask | DevelopmentMask::SameHost;
         trace->warn("samehost mode enabled");
     }
 
     if (parser.isSet("turbo"))
     {
-        g_developmentMask = (DevelopmentMask) (g_developmentMask | DevelopmentMask::TurboMeasurements);
+        g_developmentMask = g_developmentMask | DevelopmentMask::TurboMeasurements;
         trace->warn("turbo mode enabled");
     }
 
@@ -131,5 +131,5 @@ int main(int argc, char *argv[])
     }
 
     Server server(&app, address, port);
-    return app.exec();
+    return QCoreApplication::exec();
 }

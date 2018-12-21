@@ -24,7 +24,7 @@ class WS_Measurements
 public:
     void add(const QString &id, double offset_us);
 
-    void finalizePeriod(int64_t m_sec);
+    WebSocketJson finalizePeriod(int64_t m_sec);
 
     WebSocketJson getJson() const;
 
@@ -52,6 +52,7 @@ public:
 
 private:
     void sendWallOffset();
+    void broadcast(const QByteArray &data);
 
 signals:
     void signalNewWebsocketConnection();

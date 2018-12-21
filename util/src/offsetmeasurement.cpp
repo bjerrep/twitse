@@ -3,8 +3,9 @@
 
 #include <string>
 
-OffsetMeasurement::OffsetMeasurement(int index, int64_t starttime_ns, int64_t endtime_ns, int samples_sent,
-                                     int samples, size_t used, int64_t avg_ns, bool valid)
+OffsetMeasurement::OffsetMeasurement(int index, int64_t starttime_ns, int64_t endtime_ns,
+                                     size_t samples_sent, size_t samples,
+                                     size_t used, int64_t avg_ns, bool valid)
     : m_index(index),
       m_starttime_ns(starttime_ns), m_endtime_ns(endtime_ns),
       m_sentSamples(samples_sent),

@@ -22,6 +22,7 @@ int main(int argc, char *argv[])
     parser.addHelpOption();
     parser.addOptions({
         {"dumpraw", "let client(s) dump all offset samples in individual measurement files"},
+        {"dumprawsingle", "as dumpraw but only the next measurement"},
         {"clientsummaries", "(server) dump measurement summaries in client files. Used for plot data."},
         {"summaryonbailingout", "(client) write measurements to file if bailing out"},
         {"sampleperiodsweep", "sweep from 5ms sample period and up for router analysis"},

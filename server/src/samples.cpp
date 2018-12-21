@@ -5,7 +5,7 @@
 #include "apputils.h"
 #include "globals.h"
 
-extern DevelopmentMask g_developmentMask;
+extern int g_developmentMask;
 
 
 ClientSampleRun::ClientSampleRun(const QString &client, int count)
@@ -53,7 +53,7 @@ void Samples::timerEvent(QTimerEvent *)
         }
     }
 
-    if (m_sampleRuns.size() == 0)
+    if (m_sampleRuns.empty())
     {
         timerOff(this, m_timerId);
     }

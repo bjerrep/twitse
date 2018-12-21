@@ -13,7 +13,7 @@
 #include <QFile>
 #include <cmath>
 
-extern DevelopmentMask g_developmentMask;
+extern int g_developmentMask;
 extern int g_randomTrashPromille;
 SystemTime* s_systemTime = nullptr;
 
@@ -248,7 +248,7 @@ void Client::executeControl(const MulticastRxPacket& rx)
     }
     else if (action == "developmentmask")
     {
-        g_developmentMask = (DevelopmentMask) rx.value("developmentmask").toInt();
+        g_developmentMask = rx.value("developmentmask").toInt();
     }
     else if (action == "vctcxodac")
     {

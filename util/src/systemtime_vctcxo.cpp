@@ -35,9 +35,7 @@ int64_t SystemTime::getWallClock_ns()
 {
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
-    int64_t sec = ts.tv_sec;
-    int64_t nsec = ts.tv_nsec;
-    return sec * NS_IN_SEC + nsec;
+    return ts.tv_sec * NS_IN_SEC + ts.tv_nsec;
 }
 
 
@@ -54,29 +52,29 @@ void SystemTime::setWallclock_ns(int64_t epoch)
 
 void SystemTime::setPPM(double server_ppm)
 {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    int64_t time = ts.tv_sec * NS_IN_SEC + ts.tv_nsec + m_rawClockOffset;
+
     if (!m_serverPPMRawInitialized)
     {
-        m_serverLastPPMSetTime = getRawSystemTime();
+        m_serverLastPPMSetTime = time;
         m_serverPPMRawInitialized = true;
     }
     else
     {
-        struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
-        int64_t time = ts.tv_sec * NS_IN_SEC + ts.tv_nsec + m_rawClockOffset;
-
-        int64_t server_correction = (((double) time) - m_serverLastPPMSetTime) * (m_server_ppm/1000000.0);
+        int64_t server_correction = (time - m_serverLastPPMSetTime) * m_server_slope;
 
         m_rawClockOffset += server_correction;
-        m_serverLastPPMSetTime = time + server_correction;
+        m_serverLastPPMSetTime = time;
     }
-    m_server_ppm += server_ppm;
+    m_server_slope += server_ppm / 1000000.0;
 }
 
 
 double SystemTime::getPPM()
 {
-   return m_server_ppm;
+   return m_server_slope * 1000000.0;
 }
 
 #endif

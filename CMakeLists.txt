@@ -12,9 +12,11 @@ endif()
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -std=c++11")
 
 if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
+# These C flags are intended to match a Raspberry Pi 3. For other versions they should be adjusted accordingly.
+# See "GCC compiler optimization for ARM-based systems" https://gist.github.com/fm4dd/c663217935dc17f0fc73c9c81b0aa845
 # -Wno-psabi silence gcc 7.1 on rpi
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-psabi -mcpu=cortex-a53 -mfloat-abi=hard -mfpu=neon-fp-armv8")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftree-vectorize -ffast-math -funsafe-math-optimizations -pipe -O3 -g3")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-psabi -march=armv8-a+crc -mfloat-abi=hard -mfpu=neon-fp-armv8 -mneon-for-64bits -mtune=cortex-a53")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftree-vectorize -ffast-math -funsafe-math-optimizations -pipe -O3 -g0")
 endif()
 
 set(CMAKE_AUTOMOC ON)

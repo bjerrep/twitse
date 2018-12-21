@@ -7,7 +7,7 @@
 #include <QProcess>
 #include <QDir>
 
-DevelopmentMask g_developmentMask = DevelopmentMask::None;
+int g_developmentMask = DevelopmentMask::None;
 
 std::shared_ptr<spdlog::logger> trace = spdlog::stdout_color_mt("console");
 
@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
 
     QCoreApplication app(argc, argv);
 
-    g_developmentMask = (DevelopmentMask) (DevelopmentMask::AnalysisAppendToSummary);
+    g_developmentMask = DevelopmentMask::AnalysisAppendToSummary;
 
     // get naturally sorted list
     QProcess ls;

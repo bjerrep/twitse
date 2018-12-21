@@ -9,7 +9,6 @@ const bool VCTCXO_MODE = true;
 const bool VCTCXO_MODE = false;
 #endif
 
-
 #define ISUSED __attribute__((__unused__))
 
 #define INLINE __attribute__((always_inline))
@@ -51,7 +50,8 @@ enum DevelopmentMask
     SaveMeasurements            = 0x08,
     SaveClientSummaryLines      = 0x10,
     TurboMeasurements           = 0x20,
-    SamplePeriodSweep           = 0x40
+    SamplePeriodSweep           = 0x40,
+    SaveMeasurementsSingle      = 0x80
 };
 
 #define develTurbo (g_developmentMask & DevelopmentMask::TurboMeasurements)

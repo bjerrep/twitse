@@ -35,12 +35,6 @@ const DeviceDeque &DeviceManager::getDevices() const
 }
 
 
-bool DeviceManager::activeClients() const
-{
-    return !m_activeClients.empty();
-}
-
-
 bool DeviceManager::allDevicesInRunningState() const
 {
     for(auto device : m_deviceDeque)
@@ -51,6 +45,12 @@ bool DeviceManager::allDevicesInRunningState() const
         }
     }
     return true;
+}
+
+
+bool DeviceManager::idle() const
+{
+    return m_activeClients.empty();
 }
 
 
@@ -116,7 +116,7 @@ void DeviceManager::slotSampleRunStatusUpdate(const QString& client, bool active
         {
             device->getClientOffset();
         }
-        if (!m_activeClients.size())
+        if (m_activeClients.empty())
         {
             emit signalIdle();
         }

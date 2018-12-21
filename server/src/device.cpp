@@ -17,7 +17,7 @@
 #include <QTcpSocket>
 
 
-extern DevelopmentMask g_developmentMask;
+extern int g_developmentMask;
 extern int g_randomTrashPromille;
 
 Device::Device(QObject* parent, const QString& clientName)
@@ -114,6 +114,25 @@ void Device::processMeasurement(const RxPacket& rx)
     // the central offset from a measurement series
     int64_t clientoffset_ns = (client2server_ns - server2client_ns) / 2;
 
+    // save some potentially troublesome measurements on an otherwise stable system
+    // for later analysis.
+    if (m_saveOddMeasurements and
+        m_initState == InitState::RUNNING and
+        std::abs(clientoffset_ns) > m_saveOddMeasurementsThreshold_ns and
+        m_lock.getLockState() == Lock::HILOCK)
+    {
+        m_measurementSeries->saveRawMeasurements(fmt::format("/tmp/odd_raw_set_{}", name()),
+                                                 m_saveOddMeasurementsThreshold_ns / 1000);
+        m_measurementSeries->saveFilteredMeasurements(fmt::format("/tmp/odd_filtered_set_{}", name()),
+                                                      m_saveOddMeasurementsThreshold_ns / 1000);
+
+        m_saveOddMeasurementsThreshold_ns *= 1.5;
+        if (m_saveOddMeasurementsThreshold_ns > 1000000)
+        {
+            m_saveOddMeasurements = false;
+        }
+    }
+
     if (m_fixedSamplePeriod_ms > 0)
     {
         clientoffset_ns = 0;
@@ -181,14 +200,14 @@ void Device::processMeasurement(const RxPacket& rx)
 
     if (!m_averagesInitialized)
     {
-        m_avgClientOffset = clientoffset_us;
+        m_avgClientOffset_ns = clientoffset_us;
         m_avgRoundtrip_us = roundtrip_us;
         m_averagesInitialized = true;
-        m_prev = m_avgClientOffset;
+        m_previousClientOffset_ns = m_avgClientOffset_ns;
     }
     else
     {
-        m_avgClientOffset = 0.9 * m_avgClientOffset + 0.1 * clientoffset_us;
+        m_avgClientOffset_ns = 0.9 * m_avgClientOffset_ns + 0.1 * clientoffset_us;
         m_avgRoundtrip_us = 0.9 * m_avgRoundtrip_us + 0.1 * roundtrip_us;
     }
 
@@ -196,20 +215,26 @@ void Device::processMeasurement(const RxPacket& rx)
     {
         // experimental constants galore.
 #ifdef VCTCXO
-        const double magicnumber_zero = 300;
-        const double magicnumber_antislope = 8;
+        double magicnumber_zero = 300;
+        const double magicnumber_antislope = 9;
         const double magicnumber_hilock_throttle = 1.25;
         const double magicnumber_lock_throttle = 1.25;
 #else
-        const double magicnumber_zero = 800;
-        const double magicnumber_antislope = 10000;
+        double magicnumber_zero = 400;
+        const double magicnumber_antislope = 500000;
         const double magicnumber_hilock_throttle = 4;
         const double magicnumber_lock_throttle = 2;
 #endif
+        bool zero_crossing = clientoffset_us * m_previousClientOffset_ns < 0.0;
+        if (!zero_crossing and abs(clientoffset_us) < abs(m_previousClientOffset_ns))
+        {
+            magicnumber_zero *= 4;
+        }
+
         double offset_ppm = - clientoffset_us / magicnumber_zero;
 
         double deltatime = m_offsetMeasurementHistory->getLastTimespan_sec();
-        double levelling_ppm = - (clientoffset_us - m_prev) / (deltatime * magicnumber_antislope);
+        double levelling_ppm = - (clientoffset_us - m_previousClientOffset_ns) / (deltatime * magicnumber_antislope);
 
         double ppm = offset_ppm + levelling_ppm;
 
@@ -247,8 +272,15 @@ void Device::processMeasurement(const RxPacket& rx)
     }
 
     std::string extra = m_initState != RUNNING ? " (wait)" : "";
+    extra += " " + name();
+    if (!measurement.m_valid)
+    {
+        extra += " invalid";
+    }
 
-    m_prev = clientoffset_us;
+    m_previousClientOffset_ns = clientoffset_us;
+
+    double average_offset = m_initState == InitState::RUNNING ? m_avgClientOffset_ns : 0.0;
 
     std::string message = fmt::format(
                 WHITE "{}{:-3d} runtime {:5.1f} roundtrip_us {:5.1f} "
@@ -258,7 +290,7 @@ void Device::processMeasurement(const RxPacket& rx)
                 roundtrip_us,
                 m_offsetMeasurementHistory->getSD_us(),
                 m_lock.getMeasurementPeriod_sec(), m_lock.getInterMeasurementDelaySecs(), m_lock.getNofSamples(),
-                m_avgClientOffset,
+                average_offset,
                 clientoffset_us,
                 extra);
 

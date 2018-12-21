@@ -130,20 +130,24 @@ public:
     QHostAddress m_clientAddress;
     quint16 m_clientTcpPort;
     quint16 m_clientUdpPort;
-
-    MeasurementSeriesBase* m_measurementSeries;
-    OffsetMeasurementHistory* m_offsetMeasurementHistory;
-    double m_avgRoundtrip_us = 0.0;
     int m_udpOverruns = 0;
-    int m_initStateCounter = NOF_INITIAL_PPM_MEASUREMENTS;
-    InitState m_initState = InitState::PPM_MEASUREMENTS;
-    bool m_averagesInitialized = false;
-    double m_avgClientOffset = 0.0;
-    double m_prev = 0.0;
-    Lock m_lock;
-    StatusReport m_statusReport;
     bool m_clientConnected = false;
     bool m_clientActive = false;
 
+    int m_initStateCounter = NOF_INITIAL_PPM_MEASUREMENTS;
+    InitState m_initState = InitState::PPM_MEASUREMENTS;
+
+    MeasurementSeriesBase* m_measurementSeries;
+    OffsetMeasurementHistory* m_offsetMeasurementHistory;
+
+    double m_avgRoundtrip_us = 0.0;
+    bool m_averagesInitialized = false;
+    double m_avgClientOffset_ns = 0.0;
+    double m_previousClientOffset_ns = 0.0;
+    Lock m_lock;
+    StatusReport m_statusReport;
+
     int m_fixedSamplePeriod_ms = -1;
+    int m_saveOddMeasurementsThreshold_ns = 20000;
+    bool m_saveOddMeasurements = true;
 };

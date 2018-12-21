@@ -49,26 +49,22 @@ public:
     void reset();
 
     /// not sure if the inline has any effect but it mandates that the implementation is
-    /// to be here in the declarations.
+    /// here in the declaration.
     ///
     int64_t INLINE getRawSystemTime()
     {
         struct timespec ts;
-
         clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
-
-        int64_t sec = ts.tv_sec;
-        int64_t nsec = ts.tv_nsec;
-        int64_t time = sec * NS_IN_SEC + nsec + m_rawClockOffset;
+        int64_t time = ts.tv_sec * NS_IN_SEC + ts.tv_nsec + m_rawClockOffset;
 
         if (m_serverPPMRawInitialized)
         {
-            int64_t server_correction = (((double) time) - m_serverLastPPMSetTime) * (m_server_ppm/1000000.0);
+            int64_t server_correction = (time - m_serverLastPPMSetTime) * m_server_slope;
             return time + server_correction;
         }
-
         return time;
     }
+
 
     int64_t INLINE getUpdatedSystemTime()
     {
@@ -104,7 +100,7 @@ private:
 
     /// the server implements a software ppm correction for tracking the raw realtime clock to the ntp
     /// controlled wall clock. Alternatively the server could be required to be equipped with a VCTCXO like the clients.
-    double m_server_ppm = 0.0;
+    double m_server_slope = 0.0;
     int64_t m_serverLastPPMSetTime = 0;
     bool m_serverPPMRawInitialized = false;
 };

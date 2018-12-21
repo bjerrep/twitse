@@ -13,7 +13,7 @@
 Control::Control(QCoreApplication *parent, QCommandLineParser& parser, const QHostAddress &address, uint16_t port)
     : m_parent(parent)
 {
-    DevelopmentMask development_mask = DevelopmentMask::None;
+    int development_mask = DevelopmentMask::None;
 
     m_multicast = new Multicast("no1", address, port);
 
@@ -66,19 +66,23 @@ Control::Control(QCoreApplication *parent, QCommandLineParser& parser, const QHo
 
     if (parser.isSet("dumpraw"))
     {
-        development_mask = (DevelopmentMask) (development_mask | DevelopmentMask::SaveMeasurements);
+        development_mask = development_mask | DevelopmentMask::SaveMeasurements;
+    }
+    if (parser.isSet("dumprawsingle"))
+    {
+        development_mask = development_mask | DevelopmentMask::SaveMeasurementsSingle;
     }
     if (parser.isSet("clientsummaries"))
     {
-        development_mask = (DevelopmentMask) (development_mask | DevelopmentMask::SaveClientSummaryLines);
+        development_mask = development_mask | DevelopmentMask::SaveClientSummaryLines;
     }
     if (parser.isSet("summaryonbailingout"))
     {
-        development_mask = (DevelopmentMask) (development_mask | DevelopmentMask::OnBailingOut);
+        development_mask = development_mask | DevelopmentMask::OnBailingOut;
     }
     if (parser.isSet("sampleperiodsweep"))
     {
-        development_mask = (DevelopmentMask) (development_mask | DevelopmentMask::SamplePeriodSweep);
+        development_mask = development_mask | DevelopmentMask::SamplePeriodSweep;
     }
 
     if (development_mask != DevelopmentMask::None)

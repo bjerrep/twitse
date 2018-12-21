@@ -5,6 +5,7 @@
 #include "system.h"
 #include "systemtime.h"
 #include "device.h"
+#include "apputils.h"
 
 #include <QObject>
 #include <QThread>
@@ -94,7 +95,7 @@ void Server::executeControl(const MulticastRxPacket& rx)
     }
     else if (action == "developmentmask")
     {
-        g_developmentMask = (DevelopmentMask) rx.value("developmentmask").toInt();
+        g_developmentMask = rx.value("developmentmask").toInt();
     }
     else if (action == "silence")
     {
@@ -124,29 +125,31 @@ void Server::slotMulticastTx(MulticastTxPacket &tx)
 
 void Server::slotIdle()
 {
-    printStatusReport();
+    if (m_pendingStatusReport)
+    {
+        m_pendingStatusReport = false;
+        printStatusReport();
+    }
 }
 
 
 void Server::printStatusReport()
 {
-    if (m_pendingStatusReport && !m_deviceManager.activeClients())
+    std::string dhms =
+            QDateTime::fromTime_t(s_systemTime->getRunningTime_secs()).
+            toLocalTime().toString("dd:hh:mm:ss").toStdString();
+
+    double wall_diff_sec = (s_systemTime->getRawSystemTime() - SystemTime::getWallClock_ns()) / NS_IN_SEC_F;
+
+    trace->info(CYAN "    runtime {}, cputemp {:.1f}, clients {}, wall offset {:.6f} secs" RESET,
+                dhms,
+                System::cpuTemperature(),
+                m_deviceManager.getDevices().size(),
+                wall_diff_sec);
+    const DeviceDeque& devices = m_deviceManager.getDevices();
+    for (Device* device : devices)
     {
-        m_pendingStatusReport = false;
-
-        std::string dhms =
-                QDateTime::fromTime_t(s_systemTime->getRunningTime_secs()).
-                toLocalTime().toString("dd:hh:mm:ss").toStdString();
-
-        trace->info(CYAN "    runtime {}, cputemp {:.1f}" RESET,
-                    dhms,
-                    System::cpuTemperature());
-        const DeviceDeque& devices = m_deviceManager.getDevices();
-        trace->info(CYAN "    nof clients connected : {}" RESET, devices.size());
-        for (Device* device : devices)
-        {
-            trace->info(CYAN "      {}" RESET, device->getStatusReport());
-        }
+        trace->info(CYAN "      {}" RESET, device->getStatusReport());
     }
 }
 
@@ -186,14 +189,15 @@ void Server::adjustRealtimeSoftPPM()
     adjustment -= diff_sec / 10.0;
 
     // ppm adjustment rate limiter. Initially allow largish adjustments to the soft ppm but
-    // gradually decrease the max rate of change to 0.0015 ppm. This is just an empirical number
+    // gradually decrease the max rate of change to 'rate_limit' ppm. This is just an empirical number
     // that seems to keep everything at bay.
+    const double rate_limit = 0.0001;
     if (m_softPPMAdjustLimitActive)
     {
         m_softPPMAdjustLimit /= 1.5;
-        if (m_softPPMAdjustLimit < 0.0015)
+        if (m_softPPMAdjustLimit < rate_limit)
         {
-            m_softPPMAdjustLimit = 0.0015;
+            m_softPPMAdjustLimit = rate_limit;
             m_softPPMAdjustLimitActive = false;
             trace->info("software ppm limit set to {}", m_softPPMAdjustLimit);
         }
@@ -210,13 +214,6 @@ void Server::adjustRealtimeSoftPPM()
     adjustment = m_iir.filter(adjustment);
 
     s_systemTime->setPPM(adjustment);
-
-    const int period_min = 15;
-    if (m_softPPMLogMessagePrescaler++ % ((60 / m_softPPMAdjustPeriodSecs) * period_min) == 0)
-    {
-        trace->info("wall clock to raw clock skew is {:.6f} secs -> ppm {:.3f}. Adjusting with {:.6f} to {:.3f} ppm",
-                    diff_sec, ppm, adjustment, s_systemTime->getPPM());
-    }
 }
 
 
@@ -226,8 +223,23 @@ void Server::timerEvent(QTimerEvent* timerEvent)
 
     if (id == m_statusReportTimer)
     {
-        m_pendingStatusReport = true;
-        printStatusReport();
+        if (m_deviceManager.idle())
+        {
+            printStatusReport();
+        }
+        else
+        {
+            m_pendingStatusReport = true;
+        }
+    }
+    else if (VCTCXO_MODE && id == m_softPPMColdstartTimer)
+    {
+        // Establish the initial soft ppm correction between server wall clock and raw clock
+        // and start listening for clients waiting to connect
+        timerOff(this, m_softPPMColdstartTimer);
+        m_softPPMAdjustTimer = startTimer(m_softPPMAdjustPeriodSecs * TIMER_1SEC);
+        adjustRealtimeSoftPPM();
+        startServer();
     }
     else if (VCTCXO_MODE && id == m_softPPMAdjustTimer)
     {
@@ -237,15 +249,6 @@ void Server::timerEvent(QTimerEvent* timerEvent)
         {
             adjustRealtimeSoftPPM();
         }
-    }
-    else if (VCTCXO_MODE && id == m_softPPMColdstartTimer)
-    {
-        // Establish the initial soft ppm correction between server wall clock and raw clock
-        // and start listening for clients waiting to connect
-        killTimer(m_softPPMColdstartTimer);
-        m_softPPMAdjustTimer = startTimer(m_softPPMAdjustPeriodSecs * TIMER_1SEC);
-        adjustRealtimeSoftPPM();
-        startServer();
     }
     else
     {

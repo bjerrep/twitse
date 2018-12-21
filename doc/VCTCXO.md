@@ -1,7 +1,7 @@
 [start page](../README.md)
 
 # Twitse - VCTCXO mode
-Where the default Twitse build gives a pure software implementation [here](doc/TLDR.md) working on standalone and unmodified raspberry pi boards a VCTCXO build is pretty much the opposite. 
+Where the default Twitse build gives a pure software implementation [here](doc/software.md) working on standalone and unmodified raspberry pi boards a VCTCXO build is pretty much the opposite. 
 
 Here the rpi client is supposed to be mounted on a carrier board with among other things a DAC controlling a VCTCXO oscillator. The 19.2 MHz processor crystal X1 on the client rpi is removed and the pi is instead running off the VCTCXO oscillator. Rather than maintaining a software ppm correction as in the standalone mode the client can now control its own 19.2MHz base clock directly. E.g. audio dacs hanging on a i2s serial will now be running at the correct speed continuously and there is no need for clockpulse/sample skip or resampling to keep multiple clients in sync from normal xtal clock drift.
 

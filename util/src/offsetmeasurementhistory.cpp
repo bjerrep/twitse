@@ -127,9 +127,17 @@ double OffsetMeasurementHistory::getMovingAveragePPM() const
 
 double OffsetMeasurementHistory::getLastTimespan_sec() const
 {
-    return (m_offsetMeasurements.at(size() - 1).m_endtime_ns -
-            m_offsetMeasurements.at(size() - 2).m_endtime_ns)
-            / NS_IN_SEC_F;
+    try
+    {
+        return (m_offsetMeasurements.at(size() - 1).m_endtime_ns -
+                m_offsetMeasurements.at(size() - 2).m_endtime_ns)
+                / NS_IN_SEC_F;
+    }
+    catch (const std::out_of_range&)
+    {
+        trace->error("getLastTimespan_sec index out of range");
+        return 0.0;
+    }
 }
 
 

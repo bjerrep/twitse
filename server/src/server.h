@@ -8,7 +8,7 @@
 #include <QtNetwork/QUdpSocket>
 #include <QUuid>
 
-extern DevelopmentMask g_developmentMask;
+extern int g_developmentMask;
 
 class Multicast;
 
@@ -58,7 +58,6 @@ private:
     double m_softPPMAdjustLimit = 0.1;
     bool m_softPPMAdjustLimitActive = true;
     SoftPPMState m_softPPMInitState = INITIALIZE_PPM;
-    int m_softPPMLogMessagePrescaler = 0;
     int64_t m_softPPMPrevAdjustTime;
     IIR m_iir;
 };

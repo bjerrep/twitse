@@ -1,7 +1,7 @@
 #include "lock.h"
 #include "log.h"
 
-extern DevelopmentMask g_developmentMask;
+extern int g_developmentMask;
 
 int Lock::s_fixedMeasurementSilence_sec = -1;
 int Lock::s_clientSamples = -1;

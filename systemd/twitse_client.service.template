@@ -8,7 +8,7 @@ Type=simple
 User=root
 WorkingDirectory=<git root>
 ExecStart=<git root>/bin/twitse_client --id <name>
-Restart=on-failure
+Restart=always
 
 [Install]
 WantedBy=multi-user.target

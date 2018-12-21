@@ -8,6 +8,7 @@
 #include <QtWebSockets/QWebSocket>
 #include <sstream>
 
+const int DELTAS_PER_HOUR = 4;
 
 void WS_ClientPeriodMeasurements::add(double offset_us)
 {
@@ -26,9 +27,9 @@ void WS_Measurements::add(const QString &id, double offset_us)
     double max = std::numeric_limits<double>::lowest();
     double min = std::numeric_limits<double>::max();
 
-    for (const auto& client : m_lastPeriod.keys())
+    for (const auto& period_measurement : m_lastPeriod)
     {
-        const auto& offsets = m_lastPeriod.value(client).m_offsets;
+        const auto& offsets = period_measurement.m_offsets;
         if (offsets.empty())
         {
             continue;
@@ -41,17 +42,38 @@ void WS_Measurements::add(const QString &id, double offset_us)
 }
 
 
-void WS_Measurements::finalizePeriod(int64_t msec)
+WebSocketJson WS_Measurements::finalizePeriod(int64_t msec)
 {
     m_measurements.append({msec, m_largestDiff});
     
-    while (m_measurements.size() > HOURS_IN_WEEK)
+    while (m_measurements.size() > HOURS_IN_WEEK * DELTAS_PER_HOUR)
     {
         m_measurements.removeFirst();
     }
 
     m_largestDiff = std::numeric_limits<double>::lowest();
     m_lastPeriod.clear();
+
+    auto json = new QJsonObject();
+    (*json)["name"] = "server";
+    (*json)["command"] = "max_delta_offset";
+    (*json)["time"] = QString::number(msec);
+    (*json)["value"] = m_largestDiff;
+
+    double mean_us = 0.0;
+    double peak_us = 0.0;
+    if (m_measurements.size())
+    {
+        for (auto hour : m_measurements)
+        {
+            mean_us += hour.m_value / m_measurements.size();
+            peak_us = qMax(peak_us, hour.m_value);
+        }
+    }
+    (*json)["mean_us"] = mean_us;
+    (*json)["peak_us"] = peak_us;
+
+    return WebSocketJson(json);
 }
 
 
@@ -59,8 +81,10 @@ WebSocketJson WS_Measurements::getJson() const
 {
     auto json = new QJsonObject();
     (*json)["name"] = "server";
-    (*json)["command"] = "max_delta_offset";
+    (*json)["command"] = "max_delta_offset_history";
 
+    double mean_us = 0.0;
+    double peak_us = 0.0;
     QString time_ms = "[";
     QString value = "[";
     if (m_measurements.size())
@@ -69,6 +93,8 @@ WebSocketJson WS_Measurements::getJson() const
         {
             time_ms += QString::number(hour.m_sec) + ",";
             value += QString::number(hour.m_value) + ",";
+            mean_us += hour.m_value / m_measurements.size();
+            peak_us = qMax(peak_us, hour.m_value);
         }
         time_ms.chop(1);
         value.chop(1);
@@ -78,6 +104,8 @@ WebSocketJson WS_Measurements::getJson() const
 
     (*json)["time"] = time_ms;
     (*json)["value"] = value;
+    (*json)["mean_us"] = mean_us;
+    (*json)["peak_us"] = peak_us;
 
     return WebSocketJson(json);
 }
@@ -119,11 +147,13 @@ void WebSocket::slotNewOffsetMeasurement(const QString &id, double offset_us, do
 
     int64_t now_ms = SystemTime::getWallClock_ns() / NS_IN_MSEC;
 
-    int64_t period = now_ms / (MSEC_IN_HOUR / 4); // currently 15 min ..
+    int64_t period = now_ms / (MSEC_IN_HOUR / DELTAS_PER_HOUR);
     if (period > m_period)
     {
         m_period = period;
-        m_longTermMeasurements.finalizePeriod(now_ms);
+        auto json = m_longTermMeasurements.finalizePeriod(now_ms);
+        QJsonDocument doc(*json);
+        broadcast(doc.toJson());
     }
 
     auto json = new QJsonObject;
@@ -136,10 +166,7 @@ void WebSocket::slotNewOffsetMeasurement(const QString &id, double offset_us, do
 
     QJsonDocument doc(*json);
 
-    for (QWebSocket* socket : m_clients)
-    {
-        socket->sendTextMessage(doc.toJson());
-    }
+    broadcast(doc.toJson());
 
     m_webSocketHistory.append(WebSocketJson(json));
 
@@ -159,6 +186,15 @@ void WebSocket::slotNewOffsetMeasurement(const QString &id, double offset_us, do
 }
 
 
+void WebSocket::broadcast(const QByteArray& data)
+{
+    for (QWebSocket* socket : m_clients)
+    {
+        socket->sendTextMessage(data);
+    }
+}
+
+
 void WebSocket::sendWallOffset()
 {
     auto json = new QJsonObject;
@@ -170,10 +206,7 @@ void WebSocket::sendWallOffset()
 
     QJsonDocument doc(*json);
 
-    for (QWebSocket* socket : m_clients)
-    {
-        socket->sendTextMessage(doc.toJson());
-    }
+    broadcast(doc.toJson());
 }
 
 
@@ -201,16 +234,16 @@ void WebSocket::slotTextMessageReceived(const QString& message)
 
     if (command == "get_history")
     {
-        for (auto measurement : m_webSocketHistory)
+        for (const auto& measurement : m_webSocketHistory)
         {
             QJsonDocument doc(*measurement);
-            m_clients.last()->sendTextMessage(doc.toJson());
+            broadcast(doc.toJson());
         }
     }
     else if (command == "get_max_delta_history")
     {
         QJsonDocument doc(*m_longTermMeasurements.getJson().get());
-        m_clients.last()->sendTextMessage(doc.toJson());
+        broadcast(doc.toJson());
     }
     else if (command == "transient_test")
     {
@@ -254,5 +287,5 @@ void WebSocket::slotTransmit(const QJsonObject &json)
         return;
     }
     QJsonDocument doc(json);
-    m_clients.last()->sendTextMessage(doc.toJson());
+    broadcast(doc.toJson());
 }

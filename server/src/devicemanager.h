@@ -21,8 +21,8 @@ public:
     void process(const MulticastRxPacket& rx);
     Device* findDevice(const QString &name);
     const DeviceDeque& getDevices() const;
-    bool activeClients() const;
     bool allDevicesInRunningState() const;
+    bool idle() const;
 
 signals:
     void signalMulticastTx(MulticastTxPacket& tx);

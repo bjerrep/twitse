@@ -14,7 +14,7 @@ public:
     TcpTxPacket(const std::string &command);
     virtual ~TcpTxPacket() = default;
 
-    virtual QByteArray getData(bool serialize = true);
+    virtual QByteArray getData();
 
     virtual QString toString() const;
 
@@ -35,7 +35,7 @@ public:
     MulticastTxPacket(const KeyVal &keyValues);
     virtual ~MulticastTxPacket() = default;
 
-    virtual QByteArray getData(bool serialize = true);
+    virtual QByteArray getData();
 
     virtual QString toString() const;
 
