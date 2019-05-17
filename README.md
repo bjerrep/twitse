@@ -7,7 +7,7 @@ This project is an experimental playground for getting wireless raspberry pi cli
 
 The reason behind this project was to develop a diy timing framework for playing audio on multiple wireless raspberry pi clients, where e.g. two clients could be playing either right or left channel of a stereo signal, controlling an active speaker each. The accuracy actually required for such an audio setup is not part of the project here, for now its just about getting a feel for the obtainable timing accuracy in a minimal wireless setup.
 
-The Twitse project is both a hardware and a software project. The software is available here, the hardware design not so much, at least not yet. The client part of the software is intended to control a VCTCXO (voltage controlled) crystal oscillator, replacing the normal 19.2MHz raspberry pi crystal on the clients. This way the clients are kept in time sync down to and including the physical Raspberry Pi hardware. Since this is probably a little too steep for most, Twitse can also run in a pure software mode for playing around. In software mode the clients and server are in time sync in the software alone which is used by the clients to periodically adjust their wallclock.
+The Twitse project is both a hardware and a software project. The software is available here, the hardware design not so much, at least not yet. The client part of the software is intended to control a VCTCXO crystal oscillator, replacing the normal 19.2MHz raspberry pi crystal on the clients. This way the clients are kept in time sync down to and including the physical Raspberry Pi hardware. Since this is probably a little too steep for most, Twitse can also run in a pure software mode for playing around. In software mode the clients and server are in time sync in the software alone which is used by the clients to periodically adjust their wallclock.
 
 The following graph shows little over an hour of measurements on a plain 2.4GHz wifi for a single client. The purple graph is the measured time offsets, and the green lines indicate how often a measurement is made and the number of UDP packets used at each measurement. Given the awful latencies of a wireless connection it doesn't look too bad to have a graph in the microsecond domain. Its worth pointing out that this is the measured time offsets which will consist of the real offsets plus measurement noise. Since there is definitely measurement noise its probably safe to assume that the real offsets are lower than the graph suggests. The steady state finally reached with regard to network load currently uses 200 samples once every minute to keep the offsets under wraps.
 
@@ -45,7 +45,8 @@ https://hackaday.io/project/6872-gps-disciplined-xcxo
 Talk about replacing the raspberry pi X1 crystal as done here in VCTCXO mode.
 https://raspberrypi.stackexchange.com/questions/74482/switch-out-the-x1-oscillator-on-a-rpi-2-3
 
-
+Terradak TCXO RPI HAT: A audio player HAT with two TCXO oscillators intended to replace both the 19.2 and 25.0 MHz crystals on a RPI 3B+. The page has some pictures of the RPI showing the pads the xtal feeds should go to.
+https://www.teradak.com/products/115.html
 
 
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/1f1ddf68d54641658fba20d23c885ad3)](https://www.codacy.com/app/bjerrep/twitse?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=bjerrep/twitse&amp;utm_campaign=Badge_Grade)
