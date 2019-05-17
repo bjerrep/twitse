@@ -6,11 +6,19 @@ The operation is that the server time is the reference. The client continuesly a
 
 
 ## Some of the caveats
-In software mode NTP currently can't be running on the server. So NTP needs to be turned off. This is not a very useful solution as the server itself will then drift away from the real wall clock. If this happens at a rate of 10 ppm this can rather quickly become an issue. There is no solution to this yet in the current software.
+In software mode NTP currently can't be running on the server. So NTP needs to be turned off. This is not a very useful solution as the server itself will then drift away from the real wall clock. If this happens at a rate of 10 ppm this can rather quickly become an issue. There is no solution to this yet in software mode.
 
-The time reference in the client exists only inside the client application itself. The client continuously adjusts its kernel system time but the system time precision will by definition be worse than the precision of the internal time. Also keep in mind that the actual physical crystal will clock all the hardware completely ignorant of all this kernel/user space time adjusting. So e.g. the serial busses will be as far off in timing as always.
+The time reference in the client exists only inside the client application itself. The client continuously adjusts its kernel system time but the system time precision will by definition be worse than the precision of the internal time. Also keep in mind that the actual physical crystal will clock all the hardware completely ignorant of all this kernel/user space time adjusting. So e.g. the serial busses in software mode will be as far off in timing as always. 
 
 Both server and client are so far not doing anything else than measuring time. Once they actually are asked to do something useful the increased load can be expected to have an impact on the time measurements. Its not known yet what that might amount to.
+
+It appears that time measurements are influenced whenever the wifi connection decides to dynamically change bitrate. All measurement graphs and values on these pages are from raspberry pi's onboard wifi which luckily seems rather reluctant to change bitrate. Comparing rpi onboard wifi bitrates with those from a Ralink RT5572 adaptor in 10 second intervals:
+
+    RPI onboard     65   65   65   65   65    65   65    65   65   65   65   65   65
+    RT5572          78   78   78   104  104  19.5  104   104  78   78   104  104  78
+
+(while sleep 10; do iwconfig wlan0 | sed -n 's/Bit Rate=\(.*\)/\1/p' | awk '{print $1}'; done)
+Using an adaptor as the Ralink is perfectly possible, it will just be a little more noisy compared to e.g. the onboard RPI wifi. It should be possible to force a wifi connection to run with a fixed bitrate but so far that has been an exercise in futility. Talking about time measurement quality then don't forget to turn off wifi power save or the time measurements might end up on a different planet.
 
 There are no documentation, only the source code. And its probably not funny to try to decipher. The client/server design is a moving target and the split between tasks done by a client vs the server renders intuition useless.
 

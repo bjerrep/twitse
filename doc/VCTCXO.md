@@ -20,7 +20,7 @@ The server as of now includes a software ppm correction of the raw clock in an a
 
 There is a minimal audio player project made for raspberry pi's in VCTCXO mode called [Ludit](https://github.com/bjerrep/ludit). It will play stereo on two separate speakers connected to the world only through a wifi connection.
 
-The VCTCXO used can nominally be adjusted +/- 8 ppm. If the server itself is much too slow or much too fast this will effect the clients ability to get a lock. The first server tried had to be replaced since it was so far off that the clients couldn't track it at all.
+The VCTCXO (a.k.a TCVCXO) used can nominally be adjusted +/- 8 ppm. If the server itself is much too slow or much too fast this will effect the clients ability to get a lock. The first server tried had to be replaced since it was so far off that the clients couldn't track it at all. A VCXO might have a much larger adjustment range but that remains to checked out.
 
 ## Building & Running
 
