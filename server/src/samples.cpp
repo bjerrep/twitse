@@ -3,6 +3,7 @@
 #include "log.h"
 #include "systemtime.h"
 #include "apputils.h"
+#include "device.h"
 #include "globals.h"
 
 extern int g_developmentMask;
@@ -94,13 +95,18 @@ void Samples::removeClient(const QString& clientname)
 }
 
 
-void Samples::slotRequestSamples(const QString& clientname, int count, int period_ms)
+void Samples::slotRequestSamples(Device* device, int count, int period_ms)
 {
     m_period_ms = period_ms;
     timerOff(this, m_timerId);
     m_timerId = startTimer(m_period_ms, Qt::PreciseTimer);
 
-    m_sampleRuns.append(new ClientSampleRun(clientname, count));
+    if (!m_sampleRuns.empty())
+    {
+        device->measurementCollisionNotice();
+    }
+
+    m_sampleRuns.append(new ClientSampleRun(device->name().c_str(), count));
     m_client_it = m_sampleRuns.begin();
     emit signalSampleRunStatusUpdate((*m_client_it)->m_name, true);
 }

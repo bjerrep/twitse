@@ -2,6 +2,7 @@
 #include "device.h"
 #include "log.h"
 #include "websocket.h"
+#include "globals.h"
 
 #include <QTcpServer>
 
@@ -12,7 +13,7 @@ DeviceManager::DeviceManager()
     connect(&m_samples, &Samples::signalSampleRunStatusUpdate,
             this, &DeviceManager::slotSampleRunStatusUpdate);
 
-    m_webSocket = new WebSocket(12343);
+    m_webSocket = new WebSocket(g_websocketPort);
 }
 
 

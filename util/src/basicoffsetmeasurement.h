@@ -7,7 +7,7 @@
 class BasicMeasurementSeries : public MeasurementSeriesBase
 {
 public:
-    BasicMeasurementSeries(const std::string &logName, FilterType filterType = DEFAULT);
+    BasicMeasurementSeries(std::string logName, FilterType filterType = DEFAULT);
 
     void add(int64_t rawserverTime, int64_t rawclientTime) override;
     void prepareNewDataMeasurement(int samples) override;
@@ -19,9 +19,9 @@ public:
 
 private:
     bool filterMeasurementsInRange(const SampleList64 &time, const SampleList64 &diff,
-            SampleList64 &filtered_time, SampleList64 &filtered_diff,
-            int64_t lowerLimit, int64_t upperLimit,
-            int64_t &average);
+                                   SampleList64 &filtered_time, SampleList64 &filtered_diff,
+                                   int64_t lowerLimit, int64_t upperLimit,
+                                   int64_t &average);
 
     int64_t averageFromLargestHistogramBin(const SampleList64 &_x,
                                            size_t nofBins,

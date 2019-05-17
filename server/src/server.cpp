@@ -32,8 +32,6 @@ Server::Server(QCoreApplication *parent, const QHostAddress &address, uint16_t p
     qRegisterMetaType<TcpRxPacketPtr>("TcpRxPacketPtr");
     qRegisterMetaType<MulticastRxPacket>("MulticastRxPacket");
 
-    s_systemTime->reset();
-
     if (VCTCXO_MODE)
     {
         int64_t m_previousRealtimeDiff = SystemTime::getWallClock_ns() - s_systemTime->getRawSystemTime();
@@ -47,6 +45,7 @@ Server::Server(QCoreApplication *parent, const QHostAddress &address, uint16_t p
     {
         startServer();
     }
+    s_systemTime->reset();
 }
 
 
@@ -191,7 +190,7 @@ void Server::adjustRealtimeSoftPPM()
     // ppm adjustment rate limiter. Initially allow largish adjustments to the soft ppm but
     // gradually decrease the max rate of change to 'rate_limit' ppm. This is just an empirical number
     // that seems to keep everything at bay.
-    const double rate_limit = 0.0001;
+    const double rate_limit = 0.0004;
     if (m_softPPMAdjustLimitActive)
     {
         m_softPPMAdjustLimit /= 1.5;

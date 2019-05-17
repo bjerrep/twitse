@@ -16,6 +16,8 @@ const bool VCTCXO_MODE = false;
 ISUSED static const char* g_multicastIp = "225.168.1.102";
 const uint16_t g_multicastPort = 45654;
 
+const uint16_t g_websocketPort = 12343;
+
 const int g_serverPingPeriod = 5000;
 const int g_serverPingTimeout = 6000;
 

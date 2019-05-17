@@ -5,6 +5,8 @@
 #include <QJsonObject>
 #include <QTimerEvent>
 
+class Device;
+
 class ClientSampleRun
 {
 public:
@@ -26,7 +28,7 @@ public:
     void removeClient(const QString &clientname);
 
 public slots:
-    void slotRequestSamples(const QString &clientname, int count, int period_ms);
+    void slotRequestSamples(Device*, int count, int period_ms);
 
 signals:
     void signalSendTimeSample(const QString& clientname);

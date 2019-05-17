@@ -94,6 +94,7 @@ public:
     void measurementStart();
     void getClientOffset();
     std::string getStatusReport();
+    void measurementCollisionNotice();
 
 private:
     void clientDisconnected();
@@ -102,7 +103,7 @@ private:
     std::string getLogName() const;
 
 signals:
-    void signalRequestSamples(QString name, int, int);
+    void signalRequestSamples(Device*, int, int);
     void signalConnectionLost(QString name);
     void signalNewOffsetMeasurement(const QString&, double, double, double);
     void signalWebsocketTransmit(const QJsonObject& json);
@@ -133,6 +134,7 @@ public:
     int m_udpOverruns = 0;
     bool m_clientConnected = false;
     bool m_clientActive = false;
+    bool m_measurementCollisionNotice = false;
 
     int m_initStateCounter = NOF_INITIAL_PPM_MEASUREMENTS;
     InitState m_initState = InitState::PPM_MEASUREMENTS;

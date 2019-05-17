@@ -7,7 +7,7 @@ int Lock::s_fixedMeasurementSilence_sec = -1;
 int Lock::s_clientSamples = -1;
 
 
-Lock::Lock(const std::string &clientname)
+Lock::Lock(std::string clientname)
     : m_clientName(clientname)
 {
     trace->info("sample distribution is '{}'", m_distribution == BURST_SILENCE ? "burst/silence": "evenly distribution");
@@ -47,7 +47,7 @@ int Lock::getInterMeasurementDelaySecs() const
         {
             return s_fixedMeasurementSilence_sec;
         }
-        return getMeasurementPeriod_sec() - getNofSamples() * getSamplePeriod_ms() / 1000.0;
+        return std::max(Seconds[m_quality] - Samples[m_quality] * getSamplePeriod_ms() / 1000.0, 0.0);
     }
     return 0;
 }
@@ -63,7 +63,8 @@ int Lock::getSamplePeriod_ms() const
     switch (m_distribution)
     {
     case EVENLY_DISTRIBUTED:
-        return 1000 * getMeasurementPeriod_sec() / getNofSamples();
+        //return 1000 * getMeasurementPeriod_sec() / getNofSamples();
+        return (1000 * Seconds[m_quality]) / Samples[m_quality];
     case BURST_SILENCE:
         return MIN_SAMPLE_INTERVAL_ms;
     }
@@ -93,23 +94,7 @@ void Lock::setFixedSamplePeriod_ms(int ms)
 
 int Lock::getMeasurementPeriod_sec() const
 {
-    const int min_period = (m_maxSamples * MIN_SAMPLE_INTERVAL_ms) / 1000;
-
-    if (s_fixedMeasurementSilence_sec >= 0)
-    {
-        return s_fixedMeasurementSilence_sec + min_period;
-    }
-
-    if (m_quality < QUALITY_ACCEPT)
-    {
-        return min_period;
-    }
-
-    const double periodPerQuality = (MAX_MEAS_PERIOD_sec - min_period) / SPAN_QUALITY;
-
-    int period = static_cast<int> (min_period + periodPerQuality * (m_quality - QUALITY_ACCEPT));
-
-    return std::min(period, MAX_MEAS_PERIOD_sec);
+    return Seconds[m_quality];
 }
 
 
@@ -118,9 +103,13 @@ int Lock::getNofSamples() const
     if (s_clientSamples >= 0)
         return s_clientSamples;
 
-    const int factor = (m_maxSamples - MIN_NOF_SAMPLES) / MAX_QUALITY;
-    int samples = m_maxSamples - m_quality * factor;
-    return samples;
+    return Samples[m_quality];
+}
+
+
+Lock::Distribution Lock::getDistribution() const
+{
+    return m_distribution;
 }
 
 
@@ -153,29 +142,43 @@ Lock::LockState Lock::update(double offset)
     LockState lockState = m_lockState;
     const int LOCK_COUNTS = 3;
 
-    if (std::fabs(offset) < UNLOCK_THRESHOLD)
+    const double UNLOCK_THRESHOLD = 50.0;
+    const double STDLOCK_THRESHOLD = 30.0;
+    const double HILOCK_THRESHOLD = 20.0;
+    const double HILOCK_SAFE_THRESHOLD = 15.0;
+
+    offset = std::fabs(offset);
+
+    if (offset < UNLOCK_THRESHOLD)
     {
         if (m_counter < LOCK_COUNTS)
         {
             m_lockState = UNLOCKED;
             ++m_counter;
         }
-        else if (std::fabs(offset) < HILOCK_THRESHOLD)
+        else if (offset < HILOCK_THRESHOLD)
         {
             if (++m_counter >= LOCK_COUNTS + 2)
             {
                 m_lockState = HILOCK;
-                ++m_quality;
+                if (offset > HILOCK_SAFE_THRESHOLD)
+                {
+                    m_quality--;
+                }
+                else
+                {
+                    m_quality++;
+                }
             }
             else
             {
                 m_lockState = LOCKED;
             }
         }
-        else if (std::fabs(offset) < STDLOCK_THRESHOLD)
+        else if (offset < STDLOCK_THRESHOLD)
         {
             m_counter = LOCK_COUNTS;
-            m_quality /= 2;
+            m_quality -= 2;
             m_lockState = LOCKED;
         }
         else
@@ -189,9 +192,9 @@ Lock::LockState Lock::update(double offset)
         {
             m_quality = 0;
         }
-        else if (m_quality > MAX_QUALITY)
+        else if (m_quality >= QUALITY_LEVELS)
         {
-            m_quality = MAX_QUALITY;
+            m_quality = QUALITY_LEVELS - 1;
         }
     }
     else

@@ -194,9 +194,9 @@ std::string OffsetMeasurementHistory::clientToString(uint16_t dac) const
 
     if (VCTCXO_MODE)
     {
-        return fmt::format("{:-3d} runtime {:5.1f} samples/used {}/{:4.1f}% secs/size {:5.1f}/{} "
-                           "offset_us {:-5.1f} avgoff_us {:-5.1f}"
-                           " ppm {:-7.3f} avgppm {:-7.3f} sd_us {:-5.1f} vctcxo {}",
+        return fmt::format(WHITE "{:-3d} runtime {:5.1f} samples/used {}/{:4.1f}% secs/size {:5.1f}/{} "
+                                 "offset_us {:-5.1f} avgoff_us {:-5.1f}"
+                                 " ppm {:-7.3f} avgppm {:-7.3f} sd_us {:-5.1f} " YELLOW "vctcxo {}" RESET,
                            m_loop, s_systemTime->getRunningTime_secs(), m_totalMeasurements, package_loss,
                            getTimeSpan_sec(), m_offsetMeasurements.size(),
                            offset_us, m_movingAverageOffset_ns/1000.0,
@@ -204,9 +204,9 @@ std::string OffsetMeasurementHistory::clientToString(uint16_t dac) const
                            dac);
     }
 
-    return fmt::format("{:-3d} runtime {:5.1f} samples/used {}/{:4.1f}% secs/size {:5.1f}/{} "
-                       "offset_us {:-5.1f} avgoff_us {:-5.1f}"
-                       " ppm {:-7.3f} avgppm {:-7.3f} sd_us {:-5.1f} systimeppm {:-7.3f}",
+    return fmt::format(WHITE "{:-3d} runtime {:5.1f} samples/used {}/{:4.1f}% secs/size {:5.1f}/{} "
+                             "offset_us {:-5.1f} avgoff_us {:-5.1f}"
+                             " ppm {:-7.3f} avgppm {:-7.3f} sd_us {:-5.1f} systimeppm {:-7.3f}" RESET,
                        m_loop, s_systemTime->getRunningTime_secs(), m_totalMeasurements, package_loss,
                        getTimeSpan_sec(), m_offsetMeasurements.size(),
                        offset_us, m_movingAverageOffset_ns/1000.0,

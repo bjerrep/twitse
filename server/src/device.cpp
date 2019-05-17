@@ -215,7 +215,7 @@ void Device::processMeasurement(const RxPacket& rx)
     {
         // experimental constants galore.
 #ifdef VCTCXO
-        double magicnumber_zero = 300;
+        double magicnumber_zero = 330;
         const double magicnumber_antislope = 9;
         const double magicnumber_hilock_throttle = 1.25;
         const double magicnumber_lock_throttle = 1.25;
@@ -492,15 +492,25 @@ void Device::slotTcpRx()
 
         if (command == "ready")
         {
-            int delay = m_lock.getInterMeasurementDelaySecs();
+            int delay_sec = m_lock.getInterMeasurementDelaySecs();
 
-            if (delay == 0 )
+            if (m_measurementCollisionNotice)
+            {
+                m_measurementCollisionNotice = false;
+                if (delay_sec > 10)
+                {
+                    trace->info("measurement collision {}", name());
+                }
+                delay_sec -= 2;
+            }
+
+            if (delay_sec <= 0 )
             {
                 measurementStart();
             }
             else
             {
-                timerOn(this, m_sampleRunTimer, delay * 1000);
+                timerOn(this, m_sampleRunTimer, delay_sec * 1000);
             }
 
         }
@@ -591,6 +601,20 @@ std::string Device::getStatusReport()
 }
 
 
+// Called if this device started a measurement while another one was active.
+// The intention is to prevent multiple devices from consequently running with
+// interleaved measurements when all devices are running with minimum samples.
+// In all other cases it wont hurt, but it wont do any good either.
+//
+void Device::measurementCollisionNotice()
+{
+    if (m_lock.getDistribution() == Lock::BURST_SILENCE)
+    {
+        m_measurementCollisionNotice = true;
+    }
+}
+
+
 void Device::measurementStart()
 {
     int count = m_lock.getNofSamples();
@@ -602,7 +626,7 @@ void Device::measurementStart()
 
     trace->debug("{}starting sample run with {} samples and period_ms {} (slept {} secs)",
                  getLogName(), count, m_lock.getSamplePeriod_ms(), m_lock.getInterMeasurementDelaySecs());
-    emit signalRequestSamples(m_name, count, m_lock.getSamplePeriod_ms());
+    emit signalRequestSamples(this, count, m_lock.getSamplePeriod_ms());
 }
 
 

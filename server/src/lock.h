@@ -9,13 +9,7 @@ class Lock : public QObject
 {
     Q_OBJECT
 
-    const double UNLOCK_THRESHOLD = 50.0;
-    const double HILOCK_THRESHOLD = 20.0;
-    const double STDLOCK_THRESHOLD = 30.0;
-
-    const int QUALITY_ACCEPT = 8;
-    const int MAX_QUALITY = 20;
-    const double SPAN_QUALITY = MAX_QUALITY - QUALITY_ACCEPT;
+    const static int QUALITY_LEVELS = 12;
 
 #ifdef VCTCXO
     const int MIN_SAMPLE_INTERVAL_ms = 10;
@@ -44,7 +38,7 @@ public:
         EVENLY_DISTRIBUTED
     };
 
-    Lock(const std::string& clientname);
+    Lock(std::string clientname);
 
     bool isHiLock() const;
     bool isLock() const;
@@ -53,6 +47,7 @@ public:
     int getSamplePeriod_ms() const;
     int getMeasurementPeriod_sec() const;
     int getNofSamples() const;
+    Distribution getDistribution() const;
     LockState update(double offset);
     void panic();
 
@@ -77,4 +72,8 @@ private:
     static int s_fixedMeasurementSilence_sec;
     static int s_clientSamples;
     int m_fixedSamplePeriod_ms = -1;
+
+    const int Samples[QUALITY_LEVELS] = {500, 450, 400, 350, 300, 250, 220, 190, 180, 170, 160, 150};
+    const int Seconds[QUALITY_LEVELS] = {  5,   7,  10,  15,  22,  32,  45,  50,  60,  75,  90,  110};
+
 };

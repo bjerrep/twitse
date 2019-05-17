@@ -14,7 +14,7 @@
 extern int g_developmentMask;
 
 
-BasicMeasurementSeries::BasicMeasurementSeries(const std::string& logName, FilterType filterType)
+BasicMeasurementSeries::BasicMeasurementSeries(std::string logName, FilterType filterType)
     : m_logName(logName),
       m_filterType(filterType)
 {
@@ -158,7 +158,7 @@ OffsetMeasurement BasicMeasurementSeries::calculate()
     SampleList64 diff = MathFunc::diff(m_localTime, m_remoteTime);
 
     if (g_developmentMask & DevelopmentMask::SaveMeasurements or
-        g_developmentMask & DevelopmentMask::SaveMeasurementsSingle)
+            g_developmentMask & DevelopmentMask::SaveMeasurementsSingle)
     {
         DataFiles::dumpVectors("/tmp/raw_clienttime_and_serverdelay", m_nofSeries, &m_localTime, &diff);
         g_developmentMask &= ~DevelopmentMask::SaveMeasurementsSingle;
@@ -171,7 +171,7 @@ OffsetMeasurement BasicMeasurementSeries::calculate()
     filtered_diff.clear();
     int64_t average_offset_ns = 0.0;
     bool success = true;
-    size_t filtered_samples = 0;
+    size_t filtered_samples_size = 0;
 
     switch (m_filterType)
     {
@@ -183,7 +183,7 @@ OffsetMeasurement BasicMeasurementSeries::calculate()
     }
     case EVERYTHING:
     {
-        filtered_samples = diff.size();
+        filtered_samples_size = diff.size();
         average_offset_ns = MathFunc::average(diff);
         success = true;
         break;
@@ -203,14 +203,14 @@ OffsetMeasurement BasicMeasurementSeries::calculate()
             success = accept(diff.size(), filtered_diff.size(), 50.0, 10.0, 80.0, 50.0);
         }
 
-        filtered_samples = filtered_time.size();
+        filtered_samples_size = filtered_time.size();
         break;
     }
     case LARGEST_BIN_WINDOW:
     {
         auto av = averageFromLargestHistogramBin(diff, 100, 1000000);
         int64_t minimum = av - 300000;
-        int64_t maximum = av + 100000;
+        int64_t maximum = av + 110000;
 
         SampleList64 new_diff;
         SampleList64 time;
@@ -226,7 +226,7 @@ OffsetMeasurement BasicMeasurementSeries::calculate()
             success = accept(diff.size(), filtered_diff.size(), 50.0, 10.0, 70.0, 50.0);
         }
 
-        filtered_samples = filtered_time.size();
+        filtered_samples_size = filtered_time.size();
         break;
     }
     }
@@ -241,7 +241,7 @@ OffsetMeasurement BasicMeasurementSeries::calculate()
                                         filtered_time.front(), filtered_time.back(),
                                         m_measurementRun,
                                         m_localTime.size(),
-                                        filtered_samples,
+                                        filtered_samples_size,
                                         average_offset_ns,
                                         success);
 
