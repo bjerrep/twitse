@@ -1,0 +1,2 @@
+SERVER="user@hostname"
+CLIENTS="user@hostname user@hostname user@hostname user@hostname ..."
