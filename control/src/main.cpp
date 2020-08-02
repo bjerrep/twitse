@@ -26,7 +26,8 @@ int main(int argc, char *argv[])
         {"clientsummaries", "(server) dump measurement summaries in client files. Used for plot data."},
         {"summaryonbailingout", "(client) write measurements to file if bailing out"},
         {"sampleperiodsweep", "sweep from 5ms sample period and up for router analysis"},
-        {"kill", "server, 'client', all", "target"},
+        {"kill", "exit the proces(es) matching server, 'clientname' or all,"\
+                 "after which systemd will default restart them again", "target"},
         {"silence", "(server) silence in secs between measurements, 0-20 or auto", "silence"},
         {"samples", "(server) number of samples per measurement, 0-1000 or auto", "samples"},
         {"vctcxodac", "(client) set the vctcxo dac to fixed value 0-65535 or auto", "vctcxodac"},
