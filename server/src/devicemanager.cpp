@@ -3,8 +3,10 @@
 #include "log.h"
 #include "websocket.h"
 #include "globals.h"
+#include "i2c_access.h"
 
 #include <QTcpServer>
+#include <QJsonArray>
 
 DeviceManager::DeviceManager()
 {
@@ -12,8 +14,14 @@ DeviceManager::DeviceManager()
             this, &DeviceManager::slotSendTimeSample);
     connect(&m_samples, &Samples::signalSampleRunStatusUpdate,
             this, &DeviceManager::slotSampleRunStatusUpdate);
+}
 
+
+void DeviceManager::initialize()
+{
     m_webSocket = new WebSocket(g_websocketPort);
+
+    connect(m_webSocket, &WebSocket::webSocketClientRequest, this, &DeviceManager::slotWebSocketRequest);
 }
 
 
@@ -55,6 +63,12 @@ bool DeviceManager::idle() const
 }
 
 
+WebSocket* DeviceManager::webSocket()
+{
+    return m_webSocket;
+}
+
+
 void DeviceManager::process(const MulticastRxPacket& rx)
 {
     QString from = rx.value("from");
@@ -74,8 +88,8 @@ void DeviceManager::process(const MulticastRxPacket& rx)
         connect(newDevice, &Device::signalRequestSamples, &m_samples, &Samples::slotRequestSamples);
         connect(newDevice, &Device::signalConnectionLost, this, &DeviceManager::slotConnectionLost);
         connect(newDevice, &Device::signalNewOffsetMeasurement, m_webSocket, &WebSocket::slotNewOffsetMeasurement);
-        connect(newDevice, &Device::signalWebsocketTransmit, m_webSocket, &WebSocket::slotTransmit);
         connect(m_webSocket, &WebSocket::signalNewWebsocketConnection, this, &DeviceManager::slotNewWebsocketConnection);
+        connect(&newDevice->m_lock, &Lock::signalNewLockQuality, this, &DeviceManager::slotNewLockQuality);
 
         QJsonObject json;
         json["to"] = from;
@@ -156,5 +170,59 @@ void DeviceManager::slotNewWebsocketConnection()
 
 void DeviceManager::slotWebsocketTransmit(const QJsonObject &json)
 {
-    m_webSocket->slotTransmit(json);
+    m_webSocket->transmit(json);
+}
+
+
+void DeviceManager::slotWebSocketRequest(QString request)
+{
+    if (request == "get_vctcxo_dac")
+    {
+        sendVctcxoDac("server", QString::number(I2C_Access::I2C()->getVCTCXO_DAC()));
+
+        QJsonObject json;
+        json["to"] = "all";
+        json["command"] = "control";
+        json["action"] = "vctcxodac";
+        json["value"] = "get";
+        MulticastTxPacket udp(json);
+        emit signalMulticastTx(udp);
+    }
+    else if (request == "get_client_lock_quality")
+    {
+        slotNewLockQuality("*");
+    }
+}
+
+
+/// Send the given dac value to the web page through the websocket
+///
+void DeviceManager::sendVctcxoDac(const QString& from, const QString& value)
+{
+    trace->trace("sending vctcxo dac, {}={}", from.toStdString(), value.toStdString());
+
+    QJsonObject json;
+    json["name"] = "server";
+    json["command"] = "vctcxodac";
+    json["from"] = from;
+    json["value"] = value;
+
+    QJsonDocument doc(json);
+    m_webSocket->broadcast(doc.toJson());
+}
+
+
+void DeviceManager::slotNewLockQuality(const QString& name)
+{
+    for(auto device : m_deviceDeque)
+    {
+        if (device->m_name == name || name == "*")
+        {
+            auto json = QJsonObject();
+            (json)["from"] = device->m_name;
+            (json)["command"] = "device_lock_quality";
+            (json)["value"] = device->m_lock.getQuality();
+            m_webSocket->transmit(json);
+        }
+    }
 }

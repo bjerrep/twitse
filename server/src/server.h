@@ -2,7 +2,7 @@
 
 #include "devicemanager.h"
 #include "globals.h"
-#include "iir.h"
+#include "i2c_access.h"
 
 #include <QCoreApplication>
 #include <QtNetwork/QUdpSocket>
@@ -16,18 +16,13 @@ class Server : public QObject
 {
     Q_OBJECT
 
-    enum SoftPPMState {
-        INITIALIZE_PPM,
-        FIRST_ADJUSTMENT,
-        RUNNING
-    };
-
 public:
     Server(QCoreApplication *parent, const QHostAddress &address, uint16_t port);
 
     void slotMulticastTx(MulticastTxPacket& tx);
 
     void executeControl(const MulticastRxPacket& rx);
+    void processMetric(const MulticastRxPacket& rx);
     void printStatusReport();
 
 public slots:
@@ -51,13 +46,8 @@ private:
     bool m_pendingStatusReport = false;
     QString m_uid = QUuid::createUuid().toString();
 
-    int m_softPPMAdjustTimer = TIMEROFF;
-    int m_softPPMColdstartTimer = TIMEROFF;
-    const int m_softPPMAdjustPeriodSecs = 10;
-    double m_softPPMPreviousDiff = 0.0;
-    double m_softPPMAdjustLimit = 0.1;
-    bool m_softPPMAdjustLimitActive = true;
-    SoftPPMState m_softPPMInitState = INITIALIZE_PPM;
-    int64_t m_softPPMPrevAdjustTime;
-    IIR m_iir;
+    int m_wallAdjustTimer = TIMEROFF;
+    int m_wallAdjustColdstartTimer = TIMEROFF;
+    int m_wallSaveNewDefaultDAC = TIMEROFF;
+    const int m_wallAdjustPeriodSecs = 30;
 };

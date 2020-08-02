@@ -14,7 +14,7 @@ public:
 
     void reset();
 
-    inline int64_t INLINE getRawSystemTime()
+    inline int64_t INLINE getRawSystemTime_ns()
     {
         struct timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);
@@ -26,7 +26,7 @@ public:
 
     inline int64_t INLINE getUpdatedSystemTime(int64_t adjustment_ns = 0)
     {
-        int64_t systime = getRawSystemTime();
+        int64_t systime = getRawSystemTime_ns();
 
         if (!s_ppmInitialized)
             return systime;

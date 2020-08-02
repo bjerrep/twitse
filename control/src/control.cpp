@@ -78,7 +78,7 @@ Control::Control(QCoreApplication *parent, QCommandLineParser& parser, const QHo
     }
     if (parser.isSet("summaryonbailingout"))
     {
-        development_mask = development_mask | DevelopmentMask::OnBailingOut;
+        development_mask = development_mask | DevelopmentMask::SaveOnBailingOut;
     }
     if (parser.isSet("sampleperiodsweep"))
     {

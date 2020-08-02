@@ -7,6 +7,10 @@ find_package(Qt5Network)
 
 file(GLOB sources src/*)
 
+if ("${VCTCXO}" STREQUAL "OFF")
+    message("note that building for software mode will require i2c (allthough it wont be used)")
+endif()
+
 include_directories(
     ../external/spdlog/include
     )
@@ -21,5 +25,3 @@ target_link_libraries(
     Qt5::Core
     Qt5::Network
     )
-
-# add_subdirectory(multicast)

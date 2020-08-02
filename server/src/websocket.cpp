@@ -2,6 +2,7 @@
 #include "log.h"
 #include "websocket.h"
 #include "systemtime.h"
+#include "i2c_access.h"
 
 #include <QJsonDocument>
 #include <QCoreApplication>
@@ -45,7 +46,7 @@ void WS_Measurements::add(const QString &id, double offset_us)
 WebSocketJson WS_Measurements::finalizePeriod(int64_t msec)
 {
     m_measurements.append({msec, m_largestDiff});
-    
+
     while (m_measurements.size() > HOURS_IN_WEEK * DELTAS_PER_HOUR)
     {
         m_measurements.removeFirst();
@@ -201,11 +202,10 @@ void WebSocket::sendWallOffset()
     (*json)["name"] = "server";
     (*json)["command"] = "walloffset";
 
-    double diff_sec = (s_systemTime->getRawSystemTime() - SystemTime::getWallClock_ns()) / NS_IN_SEC_F;
+    double diff_sec = (s_systemTime->getRawSystemTime_ns() - SystemTime::getWallClock_ns()) / NS_IN_SEC_F;
     (*json)["value"] = fmt::format("{:.6f}", diff_sec).c_str();
 
     QJsonDocument doc(*json);
-
     broadcast(doc.toJson());
 }
 
@@ -223,6 +223,7 @@ void WebSocket::slotNewConnection()
                 socket->peerPort());
 
     emit signalNewWebsocketConnection();
+    emit webSocketClientRequest("get_client_lock_quality");
 }
 
 
@@ -231,6 +232,12 @@ void WebSocket::slotTextMessageReceived(const QString& message)
     trace->debug("message : {}", message.toStdString());
     QJsonObject json = QJsonDocument::fromJson(message.toUtf8()).object();
     QString command = json.value("command").toString();
+    QString from = json.value("from").toString();
+
+    if (from == "server")
+    {
+        return;
+    }
 
     if (command == "get_history")
     {
@@ -251,11 +258,16 @@ void WebSocket::slotTextMessageReceived(const QString& message)
     }
     else if (command == "server_restart")
     {
+        // just exit expecting a systemd script to respawn us
         QCoreApplication::quit();
     }
     else if (command == "get_wall_offset")
     {
         sendWallOffset();
+    }
+    else if (command == "get_vctcxo_dac" || command == "get_client_lock_quality")
+    {
+        emit webSocketClientRequest(command);
     }
     else
     {
@@ -280,12 +292,8 @@ void WebSocket::slotDisconnected()
 }
 
 
-void WebSocket::slotTransmit(const QJsonObject &json)
+void WebSocket::transmit(const QJsonObject &json) /// fixit why slot ?
 {
-    if (m_clients.empty())
-    {
-        return;
-    }
     QJsonDocument doc(json);
     broadcast(doc.toJson());
 }

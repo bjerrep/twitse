@@ -11,8 +11,17 @@
 #define I2CBUFPTR uint8_t
 #endif
 
-uint16_t I2C_Access::m_dac = 0x8000;
-bool I2C_Access::m_fixed_dac = false;
+I2C_Access* I2C_Access::m_self = nullptr;
+
+
+I2C_Access* I2C_Access::I2C()
+{
+    if (!I2C_Access::m_self)
+    {
+        I2C_Access::m_self = new I2C_Access();
+    }
+    return I2C_Access::m_self;
+}
 
 
 I2C_Access::I2C_Access(int bus)
@@ -23,7 +32,7 @@ I2C_Access::I2C_Access(int bus)
     if (m_descriptor >= 0)
     {
         m_valid = true;
-        trace->info("open i2c bus {} successfull", device);
+        trace->info("open i2c bus {} successful", device);
     }
     else
     {
@@ -32,7 +41,7 @@ I2C_Access::I2C_Access(int bus)
 }
 
 
-I2C_Access::~I2C_Access()
+void I2C_Access::exit()
 {
     close(m_descriptor);
 }
@@ -53,7 +62,8 @@ void I2C_Access::writeMAX5217BGUA(uint16_t value)
     write(m_descriptor, tx, 3);
 }
 
-
+/// Testing the DAC from userspace "i2cset -y 1 0x10 0x30 <hibyte> <lobyte> i"
+///
 void I2C_Access::writeLTC2606IDD1(uint16_t value)
 {
     const uint8_t LTC2606 = 0x10;
@@ -122,6 +132,16 @@ void I2C_Access::writeVCTCXO_DAC(uint16_t dac)
     m_dac = dac;
     //writeMAX5217BGUA(dac);
     writeLTC2606IDD1(dac);
+}
+
+bool I2C_Access::adjustVCTCXO_DAC(int32_t relative_dac)
+{
+    if (m_dac + relative_dac > 0xFF00 or m_dac + relative_dac < 0x0100)
+    {
+        return false;
+    }
+    writeVCTCXO_DAC(m_dac + relative_dac);
+    return true;
 }
 
 uint16_t I2C_Access::getVCTCXO_DAC()

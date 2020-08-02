@@ -5,15 +5,21 @@
 
 OffsetMeasurement::OffsetMeasurement(int index, int64_t starttime_ns, int64_t endtime_ns,
                                      size_t samples_sent, size_t samples,
-                                     size_t used, int64_t avg_ns, bool valid)
+                                     size_t used, int64_t avg_ns, ResultCode resultCode)
     : m_index(index),
       m_starttime_ns(starttime_ns), m_endtime_ns(endtime_ns),
       m_sentSamples(samples_sent),
       m_collectedSamples(samples),
       m_usedSamples(used),
       m_offset_ns(avg_ns),
-      m_valid(valid)
+      m_resultCode(resultCode)
 {
+}
+
+
+OffsetMeasurement::ResultCode OffsetMeasurement::resultCode() const
+{
+    return m_resultCode;
 }
 
 
@@ -35,7 +41,7 @@ std::string OffsetMeasurement::toString() const
                        m_index, m_endtime_ns,
                        m_collectedSamples, used_samples,
                        m_offset_ns/1000.0, m_ppm,
-                       m_valid ? "" : "invalid");
+                       m_resultCode == ResultCode::PASS ? "" : fmt::format("failed with code {}", m_resultCode));
 }
 
 

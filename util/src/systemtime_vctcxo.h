@@ -51,17 +51,11 @@ public:
     /// not sure if the inline has any effect but it mandates that the implementation is
     /// here in the declaration.
     ///
-    int64_t INLINE getRawSystemTime()
+    int64_t INLINE getRawSystemTime_ns()
     {
         struct timespec ts;
         clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
         int64_t time = ts.tv_sec * NS_IN_SEC + ts.tv_nsec + m_rawClockOffset;
-
-        if (m_serverPPMRawInitialized)
-        {
-            int64_t server_correction = (time - m_serverLastPPMSetTime) * m_server_slope;
-            return time + server_correction;
-        }
         return time;
     }
 
@@ -74,10 +68,10 @@ public:
         else
             return getWallClock();
 #else
-        return getRawSystemTime();
+        return getRawSystemTime_ns();
 #endif
     }
-    
+
     static int64_t getWallClock_ns();
     void setWallclock_ns(int64_t epoch);
 
@@ -88,7 +82,7 @@ public:
 
     double getRunningTime_secs();
 
-private:    
+private:
     int64_t getKernelSystemTime();
 
 private:
@@ -97,10 +91,5 @@ private:
     /// Added at startup as a constant difference between wall clock and the unpredictable CLOCK_MONOTONIC_RAW.
     /// In case the wall clock is sane this will yield sane epoch measurements to look at when developing.
     int64_t m_rawClockOffset = 0;
-
-    /// the server implements a software ppm correction for tracking the raw realtime clock to the ntp
-    /// controlled wall clock. Alternatively the server could be required to be equipped with a VCTCXO like the clients.
-    double m_server_slope = 0.0;
     int64_t m_serverLastPPMSetTime = 0;
-    bool m_serverPPMRawInitialized = false;
 };

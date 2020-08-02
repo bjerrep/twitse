@@ -63,7 +63,6 @@ int Lock::getSamplePeriod_ms() const
     switch (m_distribution)
     {
     case EVENLY_DISTRIBUTED:
-        //return 1000 * getMeasurementPeriod_sec() / getNofSamples();
         return (1000 * Seconds[m_quality]) / Samples[m_quality];
     case BURST_SILENCE:
         return MIN_SAMPLE_INTERVAL_ms;
@@ -107,6 +106,12 @@ int Lock::getNofSamples() const
 }
 
 
+int Lock::getQuality() const
+{
+    return m_quality;
+}
+
+
 Lock::Distribution Lock::getDistribution() const
 {
     return m_distribution;
@@ -140,6 +145,7 @@ std::string Lock::toString(LockState state)
 Lock::LockState Lock::update(double offset)
 {
     LockState lockState = m_lockState;
+    int quality = m_quality;
     const int LOCK_COUNTS = 3;
 
     const double UNLOCK_THRESHOLD = 50.0;
@@ -208,6 +214,10 @@ Lock::LockState Lock::update(double offset)
     {
         trace->info("[{}] lock status changed from {} to {}", m_clientName, toColorString(lockState), toColorString(m_lockState));
         emit signalNewLockState(m_lockState);
+    }
+    if (quality != m_quality)
+    {
+        emit signalNewLockQuality(QString(m_clientName.c_str()));
     }
     return m_lockState;
 }

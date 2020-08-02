@@ -28,7 +28,7 @@ It takes a lot of time to get comfortable playing with timing software like this
 
 The entire solution here is purely user space. There exists methods to get packet timestamping done by the network layer right before packets are sent to the PHY. This would improve the precision vastly but the raspberry pi unfortunately doesn't appear to support it.
 
-All time testing has been on raspberry pi, with development and functional testing on x86. The point is that the software is not currently optimized to run on x86 with regard to time synchronization.
+All time testing has been on raspberry pi, with development and functional testing on x86. The point is that the software is not currently optimized to run on x86 with regard to time synchronization. Notice that if both server and client are running on the same computer then the time tracking will be very poor (although it shouldn't get unstable and make things fall over).
 
 The entire system consisting of server and client means running root processes without anything that even remotely resembles any kind of security. At all.
 
@@ -41,14 +41,14 @@ After the git clone add spdlog in-tree as a git submodule:
     mkdir external && cd external
     git submodule add -f https://github.com/gabime/spdlog.git
     git submodule update --init
-    
 
-Otherwise its a standard cmake project. Dependencies are qt5-base and  probably i2c-dev. Make an out-of-source build
+
+Otherwise its a standard cmake project. Dependencies are qt5-base and  probably i2c-dev. Make an out-of-source build. The following will make a software operation build:
 
     mkdir build && cd build
     cmake .. -DCMAKE_BUILD_TYPE=release
     make (twitse_client|twitse_server)
-    
+
 Experiment with a -j# switch if building on a rpi. (4 concurrent compilations might be too much)
 
 A full build produces 4 binaries, server, client, control and dataanalysis.
@@ -70,7 +70,7 @@ Then its just left to start the server and the client. They should run as root a
 There are template service scripts for server and client in ./systemd. Edit to get the paths straight and then make a symlink to them from /etc/systemd/system:
 
     ln -s <twitse path>/systemd/twitse_<client|server>.service /etc/systemd/system
-    
+
 Remember to run 'systemctl enable <service>' if twitse should run at boot.
 
 To run a tail on the stdout log messages sent from e.g. the server when running as a service use 
@@ -98,7 +98,7 @@ The plot shows the transient offset tracking after pressing the '50us step respo
 Launch
 
     index.html
-    
+
 in doc/webmonitor in a browser. Edit it to give it the correct server ip address if needed, it will default scan the 192.168.1.* class C network.
 
 There is a systemd script 'twitse_webmonitor' in ./systemd intended to be running on the server that will launch a python 3 web server on port 8000.

@@ -1,11 +1,7 @@
-#ifndef DEFAULTDAC_H
-#define DEFAULTDAC_H
+#pragma once
 
+#include <stdint.h>
 
-class defaultdac
-{
-public:
-    defaultdac();
-};
+uint16_t loadDefaultDAC();
 
-#endif // DEFAULTDAC_H
+void saveDefaultDAC(uint16_t dac);

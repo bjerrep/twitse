@@ -30,6 +30,11 @@ Multicast::Multicast(const QString& id, const QHostAddress& address, uint16_t po
 
 void Multicast::tx(MulticastTxPacket &tx)
 {
+    if (m_multicastSocket->state() != QUdpSocket::BoundState)
+    {
+        trace->warn("-------------");
+        return;
+    }
     QByteArray data = tx.getData();
     m_multicastSocket->writeDatagram(data.data(), data.size(), m_hostAddress, m_port);
 }

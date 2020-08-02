@@ -273,9 +273,9 @@ void Device::processMeasurement(const RxPacket& rx)
 
     std::string extra = m_initState != RUNNING ? " (wait)" : "";
     extra += " " + name();
-    if (!measurement.m_valid)
+    if (measurement.resultCode() != OffsetMeasurement::PASS)
     {
-        extra += " invalid";
+        extra += OffsetMeasurement::ResultCodeAsString(measurement.resultCode());
     }
 
     m_previousClientOffset_ns = clientoffset_us;
@@ -340,7 +340,7 @@ void Device::processMeasurement(const RxPacket& rx)
             int64_t wall_offset = 0;
             for (int i = 0; i < 100; ++i)
             {
-                wall_offset += SystemTime::getWallClock_ns() - s_systemTime->getRawSystemTime();
+                wall_offset += SystemTime::getWallClock_ns() - s_systemTime->getRawSystemTime_ns();
             }
             wall_offset /= 100;
             json["wall_offset"] = QString::number(wall_offset);
@@ -499,7 +499,7 @@ void Device::slotTcpRx()
                 m_measurementCollisionNotice = false;
                 if (delay_sec > 10)
                 {
-                    trace->info("measurement collision {}", name());
+                    trace->info("measurement collision {}, offsetting next measurement", name());
                 }
                 delay_sec -= 2;
             }
@@ -519,10 +519,11 @@ void Device::slotTcpRx()
         }
         else if (command == "forwardoffset")
         {
-            bool clientValid = rx.value("valid") == "true";
+            std::string result = rx.value("valid").toStdString();
+            bool clientValid = result == OffsetMeasurement::ResultCodeAsString(OffsetMeasurement::PASS);
             if (!clientValid)
             {
-                trace->warn("{}client measurement is invalid, retrying..", getLogName());
+                trace->warn("{}client measurement is invalid ({}), retrying..", getLogName(), result);
                 m_lock.panic();
                 sampleRunComplete();
             }

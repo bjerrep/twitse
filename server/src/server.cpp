@@ -1,4 +1,5 @@
 #include "server.h"
+#include "defaultdac.h"
 #include "log.h"
 #include "globals.h"
 #include "mathfunc.h"
@@ -6,6 +7,8 @@
 #include "systemtime.h"
 #include "device.h"
 #include "apputils.h"
+#include "i2c_access.h"
+#include "websocket.h"
 
 #include <QObject>
 #include <QThread>
@@ -25,20 +28,16 @@ Server::Server(QCoreApplication *parent, const QHostAddress &address, uint16_t p
 {
     s_systemTime = new SystemTime(true);
 
-    connect(&m_deviceManager, &DeviceManager::signalMulticastTx, this, &Server::slotMulticastTx );
-    connect(&m_deviceManager, &DeviceManager::signalIdle, this, &Server::slotIdle );
-
     qRegisterMetaType<UdpRxPacketPtr>("UdpRxPacketPtr");
     qRegisterMetaType<TcpRxPacketPtr>("TcpRxPacketPtr");
     qRegisterMetaType<MulticastRxPacket>("MulticastRxPacket");
 
     if (VCTCXO_MODE)
     {
-        int64_t m_previousRealtimeDiff = SystemTime::getWallClock_ns() - s_systemTime->getRawSystemTime();
+        int64_t m_previousRealtimeDiff = SystemTime::getWallClock_ns() - s_systemTime->getRawSystemTime_ns();
         s_systemTime->adjustSystemTime_ns(m_previousRealtimeDiff);
         int seconds = develTurbo ? 2 : 15;
-        m_softPPMColdstartTimer = startTimer(seconds * TIMER_1SEC);
-        m_softPPMPrevAdjustTime = s_systemTime->getRawSystemTime();
+        m_wallAdjustColdstartTimer = startTimer(seconds * TIMER_1SEC);
         trace->info("wait while establishing wall clock drift relative to raw clock (15sec...)");
     }
     else
@@ -61,12 +60,16 @@ void Server::startServer()
 
     m_multicastThread->start();
     m_statusReportTimer = startTimer(g_statusReport);
+
+    m_deviceManager.initialize();
+    connect(&m_deviceManager, &DeviceManager::signalMulticastTx, this, &Server::slotMulticastTx );
+    connect(&m_deviceManager, &DeviceManager::signalIdle, this, &Server::slotIdle );
 }
 
 
 void Server::multicastRx(const MulticastRxPacket &rx)
 {
-    if (rx.value("from") == "server"  || ((rx.value("to") != "server" && rx.value("to") != "all")))
+    if (rx.value("from") == "server" || ((rx.value("to") != "server" && rx.value("to") != "all")))
     {
         return;
     }
@@ -75,17 +78,23 @@ void Server::multicastRx(const MulticastRxPacket &rx)
     {
         executeControl(rx);
     }
+    else if (rx.value("command") == "metric")
+    {
+        processMetric(rx);
+    }
     else
     {
         m_deviceManager.process(rx);
     }
 }
 
-
+/// Process actions sent from the standalone 'control' application. This is typically
+/// something like 'kill' or entries for manipulating the server state at runtime during development.
+///
 void Server::executeControl(const MulticastRxPacket& rx)
 {
     std::string action = rx.value("action").toStdString();
-    trace->info("got control command {}", action);
+    trace->trace("got control command {}", action);
 
     if (action == "kill")
     {
@@ -109,6 +118,24 @@ void Server::executeControl(const MulticastRxPacket& rx)
     else
     {
         trace->warn("control command not recognized, {}", action);
+    }
+}
+
+
+/// Process metrics sent from clients. This will currently originate in the web department.
+///
+void Server::processMetric(const MulticastRxPacket& rx)
+{
+    std::string action = rx.value("action").toStdString();
+    trace->trace("got metric {}", action);
+
+    if (action == "vctcxo_dac")
+    {
+        m_deviceManager.sendVctcxoDac(rx.value("from"), rx.value("value"));
+    }
+    else
+    {
+        trace->warn("metric command not recognized, {}", action);
     }
 }
 
@@ -138,7 +165,7 @@ void Server::printStatusReport()
             QDateTime::fromTime_t(s_systemTime->getRunningTime_secs()).
             toLocalTime().toString("dd:hh:mm:ss").toStdString();
 
-    double wall_diff_sec = (s_systemTime->getRawSystemTime() - SystemTime::getWallClock_ns()) / NS_IN_SEC_F;
+    double wall_diff_sec = (s_systemTime->getRawSystemTime_ns() - SystemTime::getWallClock_ns()) / NS_IN_SEC_F;
 
     trace->info(CYAN "    runtime {}, cputemp {:.1f}, clients {}, wall offset {:.6f} secs" RESET,
                 dhms,
@@ -152,67 +179,58 @@ void Server::printStatusReport()
     }
 }
 
-/// vctcxo mode only. Continous ppm adjustments of the realtime clock has the potential
-/// of really messing things up so the corrections tries to be invisibly small. The absolute NTP
-/// time is spot on, but NTP make some serious ppm adjustments to the wall clock compared to what
-/// is acceptable for the corrections here, in order to operate in a stealthy fashion.
+
+/// vctcxo mode only. Continous adjustments of the realtime/vctcxo clock has the potential
+/// of really messing things up so the corrections should ideally be invisibly small.
 /// The primary job are not to get unstable and next to avoid the difference between the wall
 /// clock and the realtime clock to drift towards infinity. After these comes the wish to actually
 /// keep the offset between the clocks minimal (which it is quite poor at delivering due to the
 /// small adjustments).
+/// Note that adjustments will not be visible before ntp decides to do something which might take
+/// quite some time. Until then all clocks are equally affected when the X1 clock is adjusted.
 ///
 void Server::adjustRealtimeSoftPPM()
 {
-    int64_t now = s_systemTime->getRawSystemTime();
-    int64_t elapsed = (now - m_softPPMPrevAdjustTime) / NS_IN_SEC_F;
-    m_softPPMPrevAdjustTime = now;
+    // Find the current absolute clock error
+    double clock_offset_sec = (s_systemTime->getRawSystemTime_ns() - SystemTime::getWallClock_ns()) / NS_IN_SEC_F;
+    double abs_clock_offset_sec = std::fabs(clock_offset_sec);
 
-    // Find current deviation between the raw and wall clock and express it as a drift in ppm
-    double diff_sec = (s_systemTime->getRawSystemTime() - SystemTime::getWallClock_ns()) / NS_IN_SEC_F;
-    // This ppm value reflects what needs to be done, its negative if the raw time is running too fast
-    double ppm = - (1000000.0 * (diff_sec - m_softPPMPreviousDiff)) / elapsed;
+    int adjustment_limit = 1;
+    std::string range("fine");
 
-    m_softPPMPreviousDiff = diff_sec;
-
-    if (m_softPPMInitState == INITIALIZE_PPM)
+    // Set the update frequency and the corresponding maximum adjustment based on the time offset above.
+    // The first block will be the panic mode which will most likely have a noticable impact on
+    // the general twitse quality.
+    // In case the wall clock is voilently off it wont be detected but the operation will remain in
+    // 'panic' mode which is kind of bad.
+    if (abs_clock_offset_sec > 0.5)
     {
-        s_systemTime->setPPM(ppm);
-        trace->info("setting raw clock software ppm to {}", ppm);
-        m_softPPMInitState = FIRST_ADJUSTMENT;
-        return;
+        range = "coarse";
+        adjustment_limit = 2;
+    }
+    else if (abs_clock_offset_sec > 0.05)
+    {
+        range = "fine";
+        adjustment_limit = 1;
+    }
+    else
+    {
+        range = "lock";
+        adjustment_limit = 0;
     }
 
-    // the adjustment will be a component trying to zero out relative drift and a component trying
-    // to get a zero absolute difference.
-    double adjustment = ppm;
-    adjustment -= diff_sec / 10.0;
+    int LSB = - qBound(-adjustment_limit, (int) (clock_offset_sec * 1000.0), adjustment_limit);
 
-    // ppm adjustment rate limiter. Initially allow largish adjustments to the soft ppm but
-    // gradually decrease the max rate of change to 'rate_limit' ppm. This is just an empirical number
-    // that seems to keep everything at bay.
-    const double rate_limit = 0.0004;
-    if (m_softPPMAdjustLimitActive)
+    if (LSB)
     {
-        m_softPPMAdjustLimit /= 1.5;
-        if (m_softPPMAdjustLimit < rate_limit)
+        bool success = I2C_Access::I2C()->adjustVCTCXO_DAC(LSB);
+        if (!success)
         {
-            m_softPPMAdjustLimit = rate_limit;
-            m_softPPMAdjustLimitActive = false;
-            trace->info("software ppm limit set to {}", m_softPPMAdjustLimit);
+            trace->error("vctcxo dac is saturated at {}", LSB);
         }
     }
-
-    adjustment = qBound(-m_softPPMAdjustLimit, adjustment, m_softPPMAdjustLimit);
-
-    if (m_softPPMInitState == FIRST_ADJUSTMENT)
-    {
-        m_iir.steadyState(adjustment);
-        m_softPPMInitState = RUNNING;
-    }
-
-    adjustment = m_iir.filter(adjustment);
-
-    s_systemTime->setPPM(adjustment);
+    trace->warn("NTP '{}'. WallClockDev={:.3f} ms LSBADJ={} DAC={}",
+                range, clock_offset_sec*1000.0, LSB, I2C_Access::I2C()->getVCTCXO_DAC());
 }
 
 
@@ -231,23 +249,30 @@ void Server::timerEvent(QTimerEvent* timerEvent)
             m_pendingStatusReport = true;
         }
     }
-    else if (VCTCXO_MODE && id == m_softPPMColdstartTimer)
+    else if (VCTCXO_MODE && id == m_wallAdjustColdstartTimer)
     {
         // Establish the initial soft ppm correction between server wall clock and raw clock
         // and start listening for clients waiting to connect
-        timerOff(this, m_softPPMColdstartTimer);
-        m_softPPMAdjustTimer = startTimer(m_softPPMAdjustPeriodSecs * TIMER_1SEC);
+        timerOff(this, m_wallAdjustColdstartTimer);
+        m_wallAdjustTimer = startTimer(m_wallAdjustPeriodSecs * TIMER_1SEC);
         adjustRealtimeSoftPPM();
         startServer();
+        m_wallSaveNewDefaultDAC = startTimer(TIMER_ONE_DAY);
     }
-    else if (VCTCXO_MODE && id == m_softPPMAdjustTimer)
+    else if (VCTCXO_MODE && id == m_wallAdjustTimer)
     {
-        // Especially at coldstart wait for the initial ppm measurement to complete for
+        // At coldstart wait for the initial ppm measurement to complete for
         // all connected devices
         if (m_deviceManager.allDevicesInRunningState())
         {
             adjustRealtimeSoftPPM();
         }
+    }
+    else if (VCTCXO_MODE && id == m_wallSaveNewDefaultDAC)
+    {
+        uint16_t dac = I2C_Access::I2C()->getVCTCXO_DAC();
+        trace->info("saving the current vctcxo dac {} (daily)", dac);
+        saveDefaultDAC(dac);
     }
     else
     {

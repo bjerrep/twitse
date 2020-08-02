@@ -11,6 +11,9 @@ class WebSocket;
 
 using DeviceDeque = QVector<Device*>;
 
+/// The DeviceManager is a utility class for the Server containing the list of all connected clients.
+/// Why it also ended up beeing the owner of the websocket instance is right now a mystery.
+///
 class DeviceManager : public QObject
 {
     Q_OBJECT
@@ -18,11 +21,15 @@ class DeviceManager : public QObject
 public:
     DeviceManager();
 
+    void initialize();
+
     void process(const MulticastRxPacket& rx);
     Device* findDevice(const QString &name);
     const DeviceDeque& getDevices() const;
     bool allDevicesInRunningState() const;
     bool idle() const;
+    WebSocket* webSocket();
+    void sendVctcxoDac(const QString& from, const QString& value);
 
 signals:
     void signalMulticastTx(MulticastTxPacket& tx);
@@ -34,6 +41,8 @@ public slots:
     void slotConnectionLost(const QString &client);
     void slotWebsocketTransmit(const QJsonObject& json);
     void slotNewWebsocketConnection();
+    void slotNewLockQuality(const QString& name);
+    void slotWebSocketRequest(QString request);
 
 private:
     DeviceManager(const DeviceManager&);
@@ -43,4 +52,3 @@ private:
     QVector<QString> m_activeClients;
     WebSocket* m_webSocket;
 };
-

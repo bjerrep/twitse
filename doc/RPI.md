@@ -64,7 +64,7 @@ The second script compiles the server and the client(s) remotely via ssh:
 If all this was in the project root on the developer PC then the following line will export the source files, build the server and clients and then restart them all:
 
     /export.sh && ./remote_build.sh && bin/control --kill all
-    
+
 This relies on the line Restart=always in the systemd scripts. 
 
 ## systemd
@@ -78,12 +78,35 @@ Systemd log file maintenance seems to have a negative impact on the time measure
 
 Issue a journalctl --disk-usage to check that the disk logs doesn't grow anymore.
 
-## other
+## SD card backup and restore
 
-backup a sd card
+### Backup
 
-dd bs=4M if=/dev/mmcblk0 status=progress | <name>_`date +%Y%m%d.gz`
+To save time and space then clean up the SD card before starting and while still mounted in the target system.
 
-restore
+Arch:
 
-gzip -dc <name.gz> | dd bs=4M of=/dev/mmcblk0
+    # pacman -Syu                       full system upgrade might be in place here
+    # pacman -Scc                       purge the entire cache
+    # pacman -Qtdq                      find orphans, run "pacman -Rns $(pacman -Qtdq)" to delete them if ok
+    # ncdu                              nice tool for analysing the diskusage in a shell
+
+
+Backup the filesystems from a standard raspberry pi SD card with a boot and root partition. If the SD card wasnt automounted then mount both boot and root partition. 'cd' to the respective mountpoints and run 
+
+    # tar -Jcvf /root/boot.tar.xz --one-file-system .
+    # tar -Jcvf /root/root.tar.xz --one-file-system .
+
+### Restore
+
+Make sure the boot partition is fat32 (-not- fat16) and set the boot flag on it for good measures. The root will typically be ext4.
+
+    # tar -xJvf /root/boot.tar.xz -C <path to mounted boot partition> --numeric-owner
+    # tar -xJvf /root/root.tar.xz -C <path to mounted root partition> --numeric-owner
+
+Run 'sync' to make sure the tar commands have run to end and unmount before ejecting the SD card.
+
+Before ejecting (and subsequently booting for the first time) consider to fix e.g. the hostname (/etc/hostname) and verify that /boot/config looks about right.
+
+
+

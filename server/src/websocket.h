@@ -1,7 +1,9 @@
 #pragma once
 
+#include "multicast.h"
 #include <QtWebSockets/QWebSocketServer>
 #include <QJsonObject>
+
 
 using WebSocketJson = QSharedPointer<QJsonObject>;
 
@@ -49,19 +51,20 @@ public:
     ~WebSocket();
 
     void slotNewOffsetMeasurement(const QString& id, double offset_us, double mean_abs_dev, double rms);
+    void broadcast(const QByteArray &data);
+    void transmit(const QJsonObject& json);
 
 private:
     void sendWallOffset();
-    void broadcast(const QByteArray &data);
 
 signals:
     void signalNewWebsocketConnection();
+    void webSocketClientRequest(QString command);
 
 public slots:
     void slotNewConnection();
     void slotTextMessageReceived(const QString&);
     void slotDisconnected();
-    void slotTransmit(const QJsonObject& json);
 
 private:
     QWebSocketServer* m_webSocket;

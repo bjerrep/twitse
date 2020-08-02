@@ -20,7 +20,7 @@ void SystemTime::adjustSystemTime_ns(int64_t adjustment_ns)
 {
     if (!s_ppmInitialized)
     {
-        setSystemTime(getRawSystemTime() + adjustment_ns);
+        setSystemTime(getRawSystemTime_ns() + adjustment_ns);
         s_resetTime += adjustment_ns;
     }
     else
@@ -35,14 +35,14 @@ void SystemTime::reset()
 {
     s_ppm = 0.0;
     s_ppmTime = 0;
-    s_resetTime = getRawSystemTime();
+    s_resetTime = getRawSystemTime_ns();
     s_ppmInitialized = false;
 }
 
 
 double SystemTime::getRunningTime_secs()
 {
-    return (getRawSystemTime() - s_resetTime) / NS_IN_SEC_F;
+    return (getRawSystemTime_ns() - s_resetTime) / NS_IN_SEC_F;
 }
 
 

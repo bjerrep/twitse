@@ -7,6 +7,9 @@ After=time-sync.target
 Type=simple
 User=root
 WorkingDirectory=<git root>
+# There is an unsolved problem regarding starting before NTP is stable.
+# Should rather query NTP for the degree of lock (if possible?)
+ExecStartPre=/bin/sleep 15
 ExecStart=<git root>/bin/twitse_server
 Restart=always
 

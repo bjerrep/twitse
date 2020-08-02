@@ -1,4 +1,5 @@
 #include "client.h"
+#include "defaultdac.h"
 #include "log.h"
 #include "globals.h"
 #include "systemtime.h"
@@ -10,7 +11,6 @@
 #include <QThread>
 #include <QTimer>
 #include <QNetworkDatagram>
-#include <QFile>
 #include <cmath>
 
 extern int g_developmentMask;
@@ -37,19 +37,17 @@ Client::Client(QCoreApplication *parent, const QString& id,
 
     if (VCTCXO_MODE)
     {
-        m_i2c = new I2C_Access(1);
-
-        double luhab_temperature = m_i2c->readTemperature();
+        double luhab_temperature = I2C_Access::I2C()->readTemperature();
         trace->info("luhab carrier board temperature is {:.1f} °C", luhab_temperature);
 
         if (autoPPM_LSB)
         {
-            m_i2c->writeVCTCXO_DAC(loadDefaultDAC());
+            I2C_Access::I2C()->writeVCTCXO_DAC(loadDefaultDAC());
         }
         else
         {
-            m_i2c->writeVCTCXO_DAC(fixedPPM_LSB);
-            m_i2c->setFixedVCTCXO_DAC(true);
+            I2C_Access::I2C()->writeVCTCXO_DAC(fixedPPM_LSB);
+            I2C_Access::I2C()->setFixedVCTCXO_DAC(true);
             trace->info("setting fixed dac to to {}", fixedPPM_LSB);
         }
     }
@@ -83,7 +81,7 @@ Client::Client(QCoreApplication *parent, const QString& id,
 Client::~Client()
 {
     delete m_measurementSeries;
-    delete m_i2c;
+    I2C_Access::I2C()->exit();
 }
 
 
@@ -116,49 +114,7 @@ void Client::reset()
             killTimer(m_saveNewDefaultDAC);
         }
         m_saveNewDefaultDAC = startTimer(TIMER_5MIN);
-        if (m_i2c)
-        {
-            m_i2c->writeVCTCXO_DAC(loadDefaultDAC());
-        }
-    }
-}
-
-
-uint16_t Client::loadDefaultDAC()
-{
-    uint16_t dac = 0x8000;
-
-    if (VCTCXO_MODE)
-    {
-        QFile file(QCoreApplication::applicationDirPath() + "/default.dac");
-        if (file.open(QIODevice::ReadOnly))
-        {
-            dac = file.readAll().toUShort();
-            trace->info("loaded vctcxo dac = {} from default.dac", dac);
-        }
-        else
-        {
-            trace->warn("couldn't open default.dac, using vctcxo dac = {}", dac);
-        }
-    }
-    return dac;
-}
-
-
-void Client::saveDefaultDAC(uint16_t dac)
-{
-    dac = (loadDefaultDAC() + dac) / 2;
-
-    QFile file(QCoreApplication::applicationDirPath() + "/default.dac");
-    if (file.open(QIODevice::WriteOnly))
-    {
-        QTextStream stream(&file);
-        stream << QString::number(dac);
-        trace->info("saved new default vctcxo dac = {} to default.dac", dac);
-    }
-    else
-    {
-        trace->warn("couldn't save new default vctcxo dac = {} to default.dac", dac);
+        I2C_Access::I2C()->writeVCTCXO_DAC(loadDefaultDAC());
     }
 }
 
@@ -239,7 +195,7 @@ void Client::multicastRx(const MulticastRxPacket& rx)
 void Client::executeControl(const MulticastRxPacket& rx)
 {
     std::string action = rx.value("action").toStdString();
-    trace->info("got control command {}", action);
+    trace->trace("got control command {}", action);
 
     if (action == "kill")
     {
@@ -253,19 +209,7 @@ void Client::executeControl(const MulticastRxPacket& rx)
     else if (action == "vctcxodac")
     {
 #ifdef VCTCXO
-        QString value = rx.value("value");
-        if (value == "auto")
-        {
-            trace->info("setting vctcxo to auto");
-            m_i2c->setFixedVCTCXO_DAC(false);
-        }
-        else
-        {
-            uint16_t dac = value.toUShort();
-            m_i2c->writeVCTCXO_DAC(dac);
-            m_i2c->setFixedVCTCXO_DAC(true);
-            trace->info("setting vctcxo to fixed value {} (0x{:04x})", dac, dac);
-        }
+        processVCTCXOcommand(rx);
 #else
         trace->error("running in software mode, there is no dac here");
 #endif
@@ -273,6 +217,36 @@ void Client::executeControl(const MulticastRxPacket& rx)
     else
     {
         trace->warn("control command not recognized, {}", action);
+    }
+}
+
+
+void Client::processVCTCXOcommand(const MulticastRxPacket& rx)
+{
+    QString value = rx.value("value");
+    if (value == "auto")
+    {
+        trace->info("setting vctcxo to auto");
+        I2C_Access::I2C()->setFixedVCTCXO_DAC(false);
+    }
+    else if (value == "get")
+    {
+        QJsonObject json;
+        json["from"] = m_id;
+        json["to"] = rx.value("from");
+        json["command"] = "metric";
+        json["action"] = "vctcxo_dac";
+        json["value"] = QString::number(I2C_Access::I2C()->getVCTCXO_DAC());
+        multicastTx(MulticastTxPacket(json));
+
+        trace->trace("sending vctcxo dac, {}={}", m_id.toStdString(), I2C_Access::I2C()->getVCTCXO_DAC());
+    }
+    else
+    {
+        uint16_t dac = value.toUShort();
+        I2C_Access::I2C()->writeVCTCXO_DAC(dac);
+        I2C_Access::I2C()->setFixedVCTCXO_DAC(true);
+        trace->info("setting vctcxo to fixed value {} (0x{:04x})", dac, dac);
     }
 }
 
@@ -347,10 +321,11 @@ void Client::tcpRx()
             json["command"] = "forwardoffset";
             OffsetMeasurement offsetMeasurement = finalizeMeasurementRun();
             json["offset"] = QString::number(offsetMeasurement.m_offset_ns);
-            json["valid"] = offsetMeasurement.m_valid ? "true" : "false";
-            trace->trace("send forwardoffset {} ns, valid {}",
+            json["valid"] = QString(OffsetMeasurement::ResultCodeAsString(offsetMeasurement.resultCode()).c_str());
+
+            trace->trace("send forwardoffset {} ns, result {}",
                          offsetMeasurement.m_offset_ns,
-                         offsetMeasurement.m_valid);
+                         OffsetMeasurement::ResultCodeAsString(offsetMeasurement.resultCode()));
             tcpTx(json);
 
             m_measurementInProgress = false;
@@ -401,7 +376,7 @@ void Client::tcpRx()
             {
                 int64_t wall_offset = rx.value("wall_clock").toLongLong();
 
-                s_systemTime->setWallclock_ns(s_systemTime->getRawSystemTime() + wall_offset);
+                s_systemTime->setWallclock_ns(s_systemTime->getRawSystemTime_ns() + wall_offset);
                 trace->info("adjusting wallclock to {}", SystemTime::getWallClock_ns());
             }
             m_offsetMeasurementHistory.reset();
@@ -490,7 +465,7 @@ void Client::adjustPPM(double ppm)
         // vctcxo "ASVTX-11-121-19.200MHz-T", nomimal +/-8ppm
         const double lsb_per_ppm = 2600.0;
 
-        int64_t dac = I2C_Access::getVCTCXO_DAC();
+        int64_t dac = I2C_Access::I2C()->getVCTCXO_DAC();
 
         int new_dac = dac - ppm * lsb_per_ppm;
 
@@ -502,7 +477,7 @@ void Client::adjustPPM(double ppm)
         }
 
         // not exactly a graceful way to adjust the dac
-        m_i2c->writeVCTCXO_DAC(new_dac);
+        I2C_Access::I2C()->writeVCTCXO_DAC(new_dac);
         trace->info("adjusted {:.6f} ppm. DAC adjusted {} from {} to {} lsb{}", ppm, new_dac - dac, dac, new_dac, extras);
     }
     else // std
@@ -566,7 +541,8 @@ void Client::timerEvent(QTimerEvent* timerEvent)
     {
         if (locked())
         {
-            saveDefaultDAC(I2C_Access::getVCTCXO_DAC());
+            uint16_t dac = ((int) loadDefaultDAC() + I2C_Access::I2C()->getVCTCXO_DAC()) / 2;
+            saveDefaultDAC(dac);
             killTimer(m_saveNewDefaultDAC);
             m_saveNewDefaultDAC = TIMEROFF;
         }
@@ -611,10 +587,10 @@ void Client::startTcpClient(const QHostAddress &address, uint16_t port)
 OffsetMeasurement Client::finalizeMeasurementRun()
 {
     OffsetMeasurement summary = m_measurementSeries->calculate();
-    if (summary.m_valid)
+    if (summary.resultCode() == OffsetMeasurement::PASS)
     {
         m_offsetMeasurementHistory.add(summary);
-        trace->info(m_offsetMeasurementHistory.clientToString(I2C_Access::getVCTCXO_DAC()));
+        trace->info(m_offsetMeasurementHistory.clientToString(I2C_Access::I2C()->getVCTCXO_DAC()));
     }
     else
     {

@@ -10,6 +10,8 @@ if (VCTCXO)
 endif()
 
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -std=c++11")
+# silence the Qt deprecation warnings that arrived somewhere around 5.15
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
 
 if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
 # These C flags are intended to match a Raspberry Pi 3. For other versions they should be adjusted accordingly.
@@ -22,6 +24,9 @@ endif()
 set(CMAKE_AUTOMOC ON)
 
 set(TWITSEROOT ${CMAKE_CURRENT_SOURCE_DIR})
+
+set(ignoreMe ${CMAKE_PREFIX_PATH})
+set(ignoreMe ${QT_QMAKE_EXECUTABLE})
 
 add_custom_target(README SOURCES README.md doc/software.md doc/RPI.md doc/VCTCXO.md .travis.yml)
 

@@ -47,6 +47,7 @@ public:
     int getSamplePeriod_ms() const;
     int getMeasurementPeriod_sec() const;
     int getNofSamples() const;
+    int getQuality() const;
     Distribution getDistribution() const;
     LockState update(double offset);
     void panic();
@@ -58,7 +59,8 @@ public:
     void setFixedSamplePeriod_ms(int ms);
 
 signals:
-    void signalNewLockState(LockState m_lockState);
+    void signalNewLockState(LockState lockState);
+    void signalNewLockQuality(const QString& name);
 
 private:
     LockState m_lockState = UNLOCKED;
@@ -73,7 +75,7 @@ private:
     static int s_clientSamples;
     int m_fixedSamplePeriod_ms = -1;
 
-    const int Samples[QUALITY_LEVELS] = {500, 450, 400, 350, 300, 250, 220, 190, 180, 170, 160, 150};
-    const int Seconds[QUALITY_LEVELS] = {  5,   7,  10,  15,  22,  32,  45,  50,  60,  75,  90,  110};
+    const int Samples[QUALITY_LEVELS] = {500, 450, 400, 360, 330, 300, 270, 250, 230, 220, 210, 200};
+    const int Seconds[QUALITY_LEVELS] = {  5,   7,  10,  15,  22,  32,  45,  50,  60,  75,  90, 110};
 
 };

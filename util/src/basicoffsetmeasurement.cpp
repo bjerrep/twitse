@@ -43,16 +43,17 @@ void BasicMeasurementSeries::prepareNewDataMeasurement(int samples)
 }
 
 
-bool BasicMeasurementSeries::accept(size_t receivedSamples,
-                                    size_t filteredSamples,
-                                    double lossFailed, double lossWarn,
-                                    double filteredFailed, double filteredWarn)
+OffsetMeasurement::ResultCode BasicMeasurementSeries::accept(
+        size_t receivedSamples,
+        size_t filteredSamples,
+        double lossFailed, double lossWarn,
+        double filteredFailed, double filteredWarn)
 {
     double lost_pct = m_samples ? 100.0 - 100.0 * receivedSamples / m_samples : 0.0;
     if (lost_pct > lossFailed)
     {
         trace->warn("{}package loss is {:.1f}%, bailing out", m_logName, lost_pct);
-        return false;
+        return OffsetMeasurement::EXCESSIVE_PACKAGELOSS;
     }
     if (lost_pct > lossWarn)
     {
@@ -63,18 +64,18 @@ bool BasicMeasurementSeries::accept(size_t receivedSamples,
     if (removed_pct > filteredFailed)
     {
         trace->warn("{}filtered out {:.1f}% samples, bailing out", m_logName, removed_pct);
-        return false;
+        return OffsetMeasurement::FILTER_ERROR;
     }
     if (removed_pct > filteredWarn)
     {
         trace->warn("{}filtered out {:.1f}% samples", m_logName, removed_pct);
     }
 
-    return true;
+    return OffsetMeasurement::PASS;
 }
 
 
-bool BasicMeasurementSeries::filterMeasurementsInRange(
+OffsetMeasurement::ResultCode BasicMeasurementSeries::filterMeasurementsInRange(
         const SampleList64& time,
         const SampleList64& diff,
         SampleList64 &filtered_time,
@@ -86,7 +87,7 @@ bool BasicMeasurementSeries::filterMeasurementsInRange(
     if (time.empty())
     {
         trace->error("{}fatal error in filterMeasurements: no data recieved", m_logName);
-        return false;
+        return OffsetMeasurement::NO_DATA;
     }
 
     for (size_t i = 0; i < time.size(); i++)
@@ -98,7 +99,7 @@ bool BasicMeasurementSeries::filterMeasurementsInRange(
         }
     }
     average = MathFunc::average(filtered_diff);
-    return true;
+    return OffsetMeasurement::PASS;
 }
 
 
@@ -170,7 +171,7 @@ OffsetMeasurement BasicMeasurementSeries::calculate()
     filtered_time.clear();
     filtered_diff.clear();
     int64_t average_offset_ns = 0.0;
-    bool success = true;
+    OffsetMeasurement::ResultCode resultCode = OffsetMeasurement::PASS;
     size_t filtered_samples_size = 0;
 
     switch (m_filterType)
@@ -178,14 +179,13 @@ OffsetMeasurement BasicMeasurementSeries::calculate()
     case DEFAULT:
     {
         trace->critical("can't apply default filter..");
-        success = false;
+        resultCode = OffsetMeasurement::INTERNALERROR;
         break;
     }
     case EVERYTHING:
     {
         filtered_samples_size = diff.size();
         average_offset_ns = MathFunc::average(diff);
-        success = true;
         break;
     }
     case LOWEST_VALUES:
@@ -193,14 +193,14 @@ OffsetMeasurement BasicMeasurementSeries::calculate()
         const int range = 600000;
         int64_t minimum = MathFunc::min(diff);
         int64_t maximum = minimum + range;
-        success = filterMeasurementsInRange(
+        resultCode = filterMeasurementsInRange(
                     m_localTime, diff,
                     filtered_time, filtered_diff,
                     minimum, maximum,
                     average_offset_ns);
-        if (success)
+        if (resultCode == OffsetMeasurement::PASS)
         {
-            success = accept(diff.size(), filtered_diff.size(), 50.0, 10.0, 80.0, 50.0);
+            resultCode = accept(diff.size(), filtered_diff.size(), 50.0, 10.0, 80.0, 50.0);
         }
 
         filtered_samples_size = filtered_time.size();
@@ -215,15 +215,15 @@ OffsetMeasurement BasicMeasurementSeries::calculate()
         SampleList64 new_diff;
         SampleList64 time;
 
-        success = filterMeasurementsInRange(
-                    m_localTime, diff,
-                    filtered_time, filtered_diff,
-                    minimum, maximum,
-                    average_offset_ns);
+        resultCode = filterMeasurementsInRange(
+                         m_localTime, diff,
+                         filtered_time, filtered_diff,
+                         minimum, maximum,
+                         average_offset_ns);
 
-        if (success)
+        if (resultCode == OffsetMeasurement::PASS)
         {
-            success = accept(diff.size(), filtered_diff.size(), 50.0, 10.0, 70.0, 50.0);
+            resultCode = accept(diff.size(), filtered_diff.size(), 50.0, 10.0, 70.0, 50.0);
         }
 
         filtered_samples_size = filtered_time.size();
@@ -231,7 +231,7 @@ OffsetMeasurement BasicMeasurementSeries::calculate()
     }
     }
 
-    if (!success && g_developmentMask & DevelopmentMask::OnBailingOut)
+    if (resultCode != OffsetMeasurement::PASS && g_developmentMask & DevelopmentMask::SaveOnBailingOut)
     {
         DataFiles::dumpVectors("onbailingout_raw", m_nofSeries, &m_localTime, &diff);
         DataFiles::dumpVectors("onbailingout_filtered", m_nofSeries, &filtered_time, &filtered_diff);
@@ -243,7 +243,7 @@ OffsetMeasurement BasicMeasurementSeries::calculate()
                                         m_localTime.size(),
                                         filtered_samples_size,
                                         average_offset_ns,
-                                        success);
+                                        resultCode);
 
     return offsetMeasurement;
 }

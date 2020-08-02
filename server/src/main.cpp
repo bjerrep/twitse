@@ -3,6 +3,7 @@
 #include "globals.h"
 #include "interface.h"
 #include "system.h"
+#include "defaultdac.h"
 
 #include <csignal>
 #include <execinfo.h>
@@ -40,6 +41,7 @@ int main(int argc, char *argv[])
     if (VCTCXO_MODE)
     {
         parser.setApplicationDescription("twitse server - vctcxo build");
+        I2C_Access::I2C()->writeVCTCXO_DAC(loadDefaultDAC());
     }
     else
     {
@@ -127,6 +129,10 @@ int main(int argc, char *argv[])
         if (!System::ntpSynced())
         {
             trace->error("giving up waiting for ntp sync");
+        }
+        else
+        {
+            trace->info("ntp is in sync, nice");
         }
     }
 

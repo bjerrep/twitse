@@ -18,7 +18,7 @@ void SystemTime::adjustSystemTime_ns(int64_t adjustment_ns)
 
 void SystemTime::reset()
 {
-    m_resetTime = getRawSystemTime();
+    m_resetTime = getRawSystemTime_ns();
 }
 
 /// For informational use on the server, the value is not corrected for xtal drift.
@@ -27,7 +27,7 @@ void SystemTime::reset()
 ///
 double SystemTime::getRunningTime_secs()
 {
-    return (getRawSystemTime() - m_resetTime) / NS_IN_SEC_F;
+    return (getRawSystemTime_ns() - m_resetTime) / NS_IN_SEC_F;
 }
 
 
@@ -52,29 +52,13 @@ void SystemTime::setWallclock_ns(int64_t epoch)
 
 void SystemTime::setPPM(double server_ppm)
 {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
-    int64_t time = ts.tv_sec * NS_IN_SEC + ts.tv_nsec + m_rawClockOffset;
-
-    if (!m_serverPPMRawInitialized)
-    {
-        m_serverLastPPMSetTime = time;
-        m_serverPPMRawInitialized = true;
-    }
-    else
-    {
-        int64_t server_correction = (time - m_serverLastPPMSetTime) * m_server_slope;
-
-        m_rawClockOffset += server_correction;
-        m_serverLastPPMSetTime = time;
-    }
-    m_server_slope += server_ppm / 1000000.0;
 }
 
 
 double SystemTime::getPPM()
 {
-   return m_server_slope * 1000000.0;
+    trace->error("getPPM invalid running with VCTCXO");
+    return 0.0;
 }
 
 #endif

@@ -42,6 +42,9 @@ https://2n3904blog.com/raspberry-pi-2-frequency-stability/
 Hackaday: GPS Disciplined xCXO. A nice writeup about voltage controlled oscillators and DACs.
 https://hackaday.io/project/6872-gps-disciplined-xcxo
 
+Hackaday: Replacing the RPI crystal with a GPS clock
+https://hackaday.com/2019/06/26/accurate-time-on-your-pi-the-extreme-way/
+
 Talk about replacing the raspberry pi X1 crystal as done here in VCTCXO mode.
 https://raspberrypi.stackexchange.com/questions/74482/switch-out-the-x1-oscillator-on-a-rpi-2-3
 

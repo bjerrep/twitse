@@ -5,24 +5,30 @@
 class I2C_Access
 {
 public:
-    I2C_Access(int bus);
-    ~I2C_Access();
+
+    static I2C_Access* I2C();
+
+    void exit();
 
     double readTemperature();
 
     void setFixedVCTCXO_DAC(bool fixed);
 
-    void writeVCTCXO_DAC(uint16_t value);
+    void writeVCTCXO_DAC(uint16_t dac);
 
-    static uint16_t getVCTCXO_DAC();
+    bool adjustVCTCXO_DAC(int32_t relative_dac);
+
+    uint16_t getVCTCXO_DAC();
 
 private:
+    I2C_Access(int bus = 1);
     void writeMAX5217BGUA(uint16_t value);
     void writeLTC2606IDD1(uint16_t value);
 
 private:
+    static I2C_Access* m_self;
     bool m_valid = false;
     int m_descriptor;
-    static uint16_t m_dac;
-    static bool m_fixed_dac;
+    uint16_t m_dac = 0x8000;
+    bool m_fixed_dac = false;
 };

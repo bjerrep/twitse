@@ -38,13 +38,12 @@ private:
     void sendServerConnectRequest();
     void transmitClientReady();
     void startTcpClient(const QHostAddress &address, uint16_t port);
+    void processVCTCXOcommand(const MulticastRxPacket& rx);
     void multicastTx(MulticastTxPacket tx);
     void tcpTx(const QJsonObject& json);
     void tcpTx(const std::string& command);
     bool locked();
     void adjustPPM(double ppm);
-    uint16_t loadDefaultDAC();
-    void saveDefaultDAC(uint16_t dac);
 
     void reconnectTimer(bool on);
     void sendLocalTimeUDP();
@@ -94,6 +93,4 @@ private:
 
     int m_lockCounter = 0;
     const int LOCK_MAX = 10;
-
-    I2C_Access* m_i2c = nullptr;
 };
