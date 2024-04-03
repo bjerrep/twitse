@@ -4,6 +4,7 @@
 #include "websocket.h"
 #include "globals.h"
 #include "i2c_access.h"
+#include "apputils.h"
 
 #include <QTcpServer>
 #include <QJsonArray>
@@ -16,6 +17,10 @@ DeviceManager::DeviceManager()
             this, &DeviceManager::slotSampleRunStatusUpdate);
 }
 
+DeviceManager::~DeviceManager()
+{
+    delete m_webSocket;
+}
 
 void DeviceManager::initialize()
 {
@@ -76,10 +81,12 @@ void DeviceManager::process(const MulticastRxPacket& rx)
 
     if (command == "connect")
     {
-        trace->info("[{:<8}] connection request on {}", from.toStdString(), rx.value("endpoint").toStdString());
+        trace->info("{} connection request on {}",
+                    apputils::DeviceLabel(from.toStdString()),
+                    rx.value("endpoint").toStdString());
         if (findDevice(from))
         {
-            trace->warn("[{:<8}] already registered - connection request ignored", from.toStdString());
+            trace->warn("{} already registered - connection request ignored", apputils::DeviceLabel(from.toStdString()));
             return;
         }
         Device* newDevice = new Device(this, from);
@@ -88,8 +95,8 @@ void DeviceManager::process(const MulticastRxPacket& rx)
         connect(newDevice, &Device::signalRequestSamples, &m_samples, &Samples::slotRequestSamples);
         connect(newDevice, &Device::signalConnectionLost, this, &DeviceManager::slotConnectionLost);
         connect(newDevice, &Device::signalNewOffsetMeasurement, m_webSocket, &WebSocket::slotNewOffsetMeasurement);
+        connect(newDevice, &Device::signalWebsocketTransmit, this, &DeviceManager::slotWebsocketTransmit);
         connect(m_webSocket, &WebSocket::signalNewWebsocketConnection, this, &DeviceManager::slotNewWebsocketConnection);
-        connect(&newDevice->m_lock, &Lock::signalNewLockQuality, this, &DeviceManager::slotNewLockQuality);
 
         QJsonObject json;
         json["to"] = from;
@@ -108,10 +115,6 @@ void DeviceManager::slotSendTimeSample(const QString& client)
     if (device)
     {
         device->sendServerTimeUDP();
-    }
-    else
-    {
-        trace->warn("internal error #0080");
     }
 }
 
@@ -170,6 +173,9 @@ void DeviceManager::slotNewWebsocketConnection()
 
 void DeviceManager::slotWebsocketTransmit(const QJsonObject &json)
 {
+    auto command = json.value("command").toString();
+    trace->debug("websocket tx command {}", command.toStdString());
+
     m_webSocket->transmit(json);
 }
 
@@ -218,11 +224,7 @@ void DeviceManager::slotNewLockQuality(const QString& name)
     {
         if (device->m_name == name || name == "*")
         {
-            auto json = QJsonObject();
-            (json)["from"] = device->m_name;
-            (json)["command"] = "device_lock_quality";
-            (json)["value"] = device->m_lock.getQuality();
-            m_webSocket->transmit(json);
+            device->transmitLockAndQuality();
         }
     }
 }

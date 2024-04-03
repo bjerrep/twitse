@@ -33,12 +33,21 @@ Client::Client(QCoreApplication *parent, const QString& id,
     qRegisterMetaType<TcpRxPacketPtr>("TcpRxPacketPtr");
     qRegisterMetaType<MulticastRxPacket>("MulticastRxPacket");
 
-    reset();
+    reset("client starting");
 
     if (VCTCXO_MODE)
     {
-        double luhab_temperature = I2C_Access::I2C()->readTemperature();
-        trace->info("luhab carrier board temperature is {:.1f} °C", luhab_temperature);
+        double luhab_temperature;
+        auto success = I2C_Access::I2C()->readTemperature(luhab_temperature);
+
+        if (success)
+        {
+            trace->info("luhab carrier board temperature is {:.1f} °C", luhab_temperature);
+        }
+        else
+        {
+            trace->info("could not read carrier board temperature (thats ok)");
+        }
 
         if (autoPPM_LSB)
         {
@@ -50,6 +59,7 @@ Client::Client(QCoreApplication *parent, const QString& id,
             I2C_Access::I2C()->setFixedVCTCXO_DAC(true);
             trace->info("setting fixed dac to to {}", fixedPPM_LSB);
         }
+        m_targetDAC = I2C_Access::I2C()->getVCTCXO_DAC();
     }
     else // software
     {
@@ -75,6 +85,8 @@ Client::Client(QCoreApplication *parent, const QString& id,
     sendServerConnectRequest();
 
     m_SystemTimeRefreshTimer = startTimer(TIMER_20MS);
+    // Outcomment to disable gradual DAC adjustments.
+    m_DACadjustmentTimer = startTimer(TIMER_1SEC);
 }
 
 
@@ -85,9 +97,9 @@ Client::~Client()
 }
 
 
-void Client::reset()
+void Client::reset(const QString& reason)
 {
-    trace->debug("client is resetting");
+    trace->debug("client is resetting: {}", reason.toStdString());
     m_connectionState = ConnectionState::NOT_CONNECTED;
     delete m_measurementSeries;
 
@@ -149,11 +161,6 @@ void Client::reconnectTimer(bool on)
 
 void Client::multicastRx(const MulticastRxPacket& rx)
 {
-    if (m_logLevel == spdlog::level::trace)
-    {
-        trace->trace("rx multicast: {}", rx.toString().toStdString());
-    }
-
     if (m_connectionState == ConnectionState::CONNECTED)
     {
         if (rx.value("from") == "server" && rx.value("uid") != m_serverUid)
@@ -165,8 +172,11 @@ void Client::multicastRx(const MulticastRxPacket& rx)
 
     if (rx.value("from") == m_id || ((rx.value("to") != m_id && rx.value("to") != "all")))
     {
+        trace->trace("rx multicast (discarded): {}", rx.toString().toStdString());
         return;
     }
+
+    trace->debug("rx multicast: {}", rx.toString().toStdString());
 
     if (m_connectionState == ConnectionState::NOT_CONNECTED)
     {
@@ -428,6 +438,11 @@ bool Client::locked()
 }
 
 
+/* During normal operation the client autonomously adjusts its vctcxo dac
+ * based on a relative ppm value from the server. The idea is that it is the client
+ * that knows e.g. the sensitivity of its own vctcxo oscillator when converting a ppm
+ * value to a dac adjustment.
+ */
 void Client::adjustPPM(double ppm)
 {
     if (VCTCXO_MODE)
@@ -463,6 +478,9 @@ void Client::adjustPPM(double ppm)
         }
 
         // vctcxo "ASVTX-11-121-19.200MHz-T", nomimal +/-8ppm
+        // Rather than a constant the lsb_per_ppm should be a calculation based on real measurements
+        // on the given vctcxo. It would be nice if it at least covered the expected nonlinearities
+        // at the extremes.
         const double lsb_per_ppm = 2600.0;
 
         int64_t dac = I2C_Access::I2C()->getVCTCXO_DAC();
@@ -476,9 +494,20 @@ void Client::adjustPPM(double ppm)
             trace->critical("dac is saturated");
         }
 
-        // not exactly a graceful way to adjust the dac
-        I2C_Access::I2C()->writeVCTCXO_DAC(new_dac);
-        trace->info("adjusted {:.6f} ppm. DAC adjusted {} from {} to {} lsb{}", ppm, new_dac - dac, dac, new_dac, extras);
+        if (m_DACadjustmentTimer != TIMEROFF)
+        {
+            // let the timer make gradual adjustments. Sounds like a good idea
+            // unless e.g. the DAC output itself has a noise component from each i2c write...
+            // The jury is still out regarding this one at time of writing.
+            m_targetDAC = new_dac;
+        }
+        else
+        {
+            // just write the new dac in one go. This is the brutal one.
+            I2C_Access::I2C()->writeVCTCXO_DAC(new_dac);
+        }
+
+        trace->info("adjust {:.6f} ppm as DAC {} lsb (from {} to {}){}", ppm, new_dac - dac, dac, new_dac, extras);
     }
     else // std
     {
@@ -519,6 +548,24 @@ void Client::timerEvent(QTimerEvent* timerEvent)
         }
 #endif
     }
+    else if (timerid == m_DACadjustmentTimer)
+    {
+        if (!I2C_Access::I2C()->getFixedVCTCXO_DAC())
+        {
+            int current_dac = I2C_Access::I2C()->getVCTCXO_DAC();
+            int diff = m_targetDAC - current_dac;
+            if (diff)
+            {
+                int diff_rate = diff / 5;
+                if (!diff_rate)
+                {
+                    diff_rate = diff > 0 ? 1 : -1;
+                }
+                I2C_Access::I2C()->adjustVCTCXO_DAC(diff_rate);
+                trace->debug("adjust dac gradual with {}", diff_rate);
+            }
+        }
+    }
     else if (timerid == m_reconnectTimer)
     {
         sendServerConnectRequest();
@@ -531,7 +578,7 @@ void Client::timerEvent(QTimerEvent* timerEvent)
             return;
         }
         trace->error("**** server connection lost ****");
-        reset();
+        reset("server lost");
     }
     else if (timerid == m_clientPingTimer)
     {

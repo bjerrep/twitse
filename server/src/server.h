@@ -49,5 +49,5 @@ private:
     int m_wallAdjustTimer = TIMEROFF;
     int m_wallAdjustColdstartTimer = TIMEROFF;
     int m_wallSaveNewDefaultDAC = TIMEROFF;
-    const int m_wallAdjustPeriodSecs = 30;
+    const int m_wallAdjustPeriodSecs = 15;
 };

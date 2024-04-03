@@ -9,6 +9,7 @@
 #include "apputils.h"
 #include "i2c_access.h"
 #include "websocket.h"
+#include "ntpcheck.h"
 
 #include <QObject>
 #include <QThread>
@@ -208,7 +209,7 @@ void Server::adjustRealtimeSoftPPM()
         range = "coarse";
         adjustment_limit = 2;
     }
-    else if (abs_clock_offset_sec > 0.05)
+    else if (abs_clock_offset_sec > 0.02)
     {
         range = "fine";
         adjustment_limit = 1;

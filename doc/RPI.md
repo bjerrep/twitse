@@ -4,9 +4,10 @@
 
 Used on both client and server, both RPI 3
 
+    initramfs initramfs-linux.img followkernel
+    
     enable_uart=1
     dtparam=sd_overclock=100
-    dtparam=spi=on
     gpu_mem=16
     force_turbo=1
     arm_freq=1300
@@ -19,6 +20,11 @@ Used on both client and server, both RPI 3
     dtparam=i2c1=on
     dtparam=i2c_arm=on
     dtparam=spi=on
+    dtoverlay=pi3-disable-bt
+    force_eeprom_read=0
+    
+    # client only with a hifiberry soundcard
+    dtoverlay=hifiberry-dac
 
 
 ## client
@@ -35,37 +41,21 @@ Make persistent as udev rule _/etc/udev/rules.d/70-wifi-powersave.rules_
 
 Stop anything sounding like ntp or systemd-timesyncd or the like if running in software mode.
 
-## building - native
+## Building - native
 
-Building on the Pi is super slow. A few scripts will make life much easier for testing. As the first thing copy the development PC public keys to the server and clients (see ssh-copy-id) to avoid having to login. Then as a first login to the Pi's and manually run cmake and make to verify that everything is ready.
+Building natively (as opposed to crosscompile) on the Pi is super slow but a few scripts will make life much easier for build-deploy cycles when developing. As the first thing copy the development PC public keys to the server and clients (see ssh-copy-id) to avoid having to login. Then as a first manually login to the Pi's and  run cmake to setup the correct build targets and build the relevant target(s) to catch any missing dependencies. If there is no ntp (e.g. systemd-timesyncd) client running on the target then start one before building to avoid confusing make.
 
-The first script uses rsync for beaming the latest and greatest source files to the Raspberry Pi computers. Here there are two clients. Adapt the number of clients and their usernames and hostnames.
+Make a *remote_server_and_clients.txt* file in ./scripts with the server and/or client that should be used.
 
-    export.sh
+Now there is a scripts/export.sh and a scripts/build.sh that do what they say.
 
-    #!/bin/bash
-    # Execute from project root. Adapt usernames and hostnames. 
-    # Also adapt the destination path if the project isnt located directly in the remote home dir.
-    rsync --exclude ".git" --exclude "build*" --exclude "bin"  -av -e ssh ${PWD} ludit@server:/home/ludit
-    rsync --exclude ".git" --exclude "build*" --exclude "bin"  -av -e ssh ${PWD} ludit@right:/home/ludit
-    rsync --exclude ".git" --exclude "build*" --exclude "bin"  -av -e ssh ${PWD} ludit@left:/home/ludit
+So in twitse root its now
 
-The second script compiles the server and the client(s) remotely via ssh:
+`$ scripts/export.sh && scripts/build.sh && bin/control --kill all`
 
-    remote_build.sh
+Things started with systemd will now restart (given that Restart=always in the systemd scripts).
 
-    #!/bin/bash
-    ssh -t ludit@server "cd ~/twitse/build ; make -j2 twitse_server control" &
-    ssh -t ludit@left "cd ~/twitse/build ; make -j2 twitse_client" &
-    ssh -t ludit@right "cd ~/twitse/build ; make -j2 twitse_client" &
-    wait < <(jobs -p)
-    exit
-
-If all this was in the project root on the developer PC then the following line will export the source files, build the server and clients and then restart them all:
-
-    /export.sh && ./remote_build.sh && bin/control --kill all
-
-This relies on the line Restart=always in the systemd scripts. 
+Otherwise processes will just exit and be ready to get restarted.
 
 ## systemd
 
@@ -78,35 +68,39 @@ Systemd log file maintenance seems to have a negative impact on the time measure
 
 Issue a journalctl --disk-usage to check that the disk logs doesn't grow anymore.
 
-## SD card backup and restore
+
+
+# SD card backup and restore
+
+If fed up with binary copies of entire SD cards that for a start are problematic when SD cards are (never) the same size and manufacturer then just copy the files present and relevant on the SD card from the mounted /boot and / partitions.
 
 ### Backup
 
-To save time and space then clean up the SD card before starting and while still mounted in the target system.
+Make a copy of the /boot and /root partitions as verbatim filesystem copies with uncompressed files. (last exclude matches Arch package cache)
 
-Arch:
+```
+#	rsync -av <src> <dest> --exclude 'usr/share/doc/' --exclude 'var/cache/pacman/pkg/'
+```
 
-    # pacman -Syu                       full system upgrade might be in place here
-    # pacman -Scc                       purge the entire cache
-    # pacman -Qtdq                      find orphans, run "pacman -Rns $(pacman -Qtdq)" to delete them if ok
-    # ncdu                              nice tool for analysing the diskusage in a shell
+Note: Make sure that the destination drive is also formatted as Ext4 so symlinks etc. can be preserved.
 
-
-Backup the filesystems from a standard raspberry pi SD card with a boot and root partition. If the SD card wasnt automounted then mount both boot and root partition. 'cd' to the respective mountpoints and run 
-
-    # tar -Jcvf /root/boot.tar.xz --one-file-system .
-    # tar -Jcvf /root/root.tar.xz --one-file-system .
+There is a number of root directories that it makes no sense to backup (/proc /dev etc) but for some reason they seem to get ignored by the rsync above.
 
 ### Restore
 
-Make sure the boot partition is fat32 (-not- fat16) and set the boot flag on it for good measures. The root will typically be ext4.
+Restore to a mount point. Observe the / on the source in order not to make the last source directory on destination as the root for the restore.
 
-    # tar -xJvf /root/boot.tar.xz -C <path to mounted boot partition> --numeric-owner
-    # tar -xJvf /root/root.tar.xz -C <path to mounted root partition> --numeric-owner
+#rsync -av <src>/ <dest>
 
-Run 'sync' to make sure the tar commands have run to end and unmount before ejecting the SD card.
 
-Before ejecting (and subsequently booting for the first time) consider to fix e.g. the hostname (/etc/hostname) and verify that /boot/config looks about right.
+
+Links:
+
+https://help.ubuntu.com/community/BackupYourSystem/TAR
+
+# Prerequisites
+
+Optionals: usbutils, lshw, ethtool
 
 
 

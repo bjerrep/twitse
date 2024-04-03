@@ -32,7 +32,7 @@ public:
     ~Client();
 
 private:
-    void reset();
+    void reset(const QString& reason);
     OffsetMeasurement finalizeMeasurementRun();
 
     void sendServerConnectRequest();
@@ -67,6 +67,8 @@ private:
     bool m_noClockAdj;
     QString m_serverUid;
 
+    int m_targetDAC = 0;
+
     QThread* m_multicastThread;
     Multicast* m_multicast = nullptr;
     QTcpSocket m_tcpSocket;
@@ -81,6 +83,7 @@ private:
     int m_clientPingTimer = TIMEROFF;
     int m_SystemTimeRefreshTimer = TIMEROFF;
     int m_saveNewDefaultDAC = TIMEROFF;
+    int m_DACadjustmentTimer = TIMEROFF;
 
     BasicMeasurementSeries* m_measurementSeries = nullptr;
     OffsetMeasurementHistory m_offsetMeasurementHistory;

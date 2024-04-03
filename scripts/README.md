@@ -14,21 +14,29 @@ NOTE: All scripts expects the current working directory (PWD) to be the twitse r
 
 
 
-## ./scripts/remote_export.sh
+## ./scripts/export.sh
 
 rsync all source files to remotes
 
 
 
-## ./scripts/remote_cmake_vctcxo.sh
+## ./scripts/cmake_vctcxo.sh
 
 configure all remotes (first time) or reconfigure all remotes in case of project structure changes. Targets will be release builds in vctcxo mode.
 
 
 
-## ./scripts/remote_build.sh
+## ./scripts/build.sh
 
 build on all remotes (in parallel)
+
+
+
+## ./scripts/reboot.sh
+
+Reboot all twitse computers. Allow the ludit user to reboot without a password in sudoers file:
+
+ludit ALL = NOPASSWD: /sbin/reboot
 
 
 
@@ -36,7 +44,7 @@ build on all remotes (in parallel)
 
 So if there are just changes in one or more source files then the fire and forget will be:
 
-./scripts/remote_export.sh && ./scripts/remote_build.sh && ./bin/control --kill all
+./scripts/export.sh && ./scripts/build.sh && ./bin/control --kill all
 
 The control application (part of twitse) is here used to make all the remote applications terminate and the default configuration of the twitse systemd scipts will then make systemd restart them automatically.
 

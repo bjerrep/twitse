@@ -15,6 +15,7 @@ external/spdlog
 #devel scripts
 *.sh
 doc/notes
+scripts/remote_server_and_clients.txt
 
 #editor backups
 *.kate-swp

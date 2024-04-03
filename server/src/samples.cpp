@@ -37,7 +37,7 @@ void Samples::timerEvent(QTimerEvent *)
         if ((*m_client_it)->m_count == 0)
         {
             trace->debug("{} sample run completed in {:.1f} secs",
-                         (*m_client_it)->m_name.toStdString(),
+                         apputils::DeviceLabel((*m_client_it)->m_name.toStdString()),
                          s_systemTime->getRunningTime_secs() - (*m_client_it)->m_startTime);
             emit signalSampleRunStatusUpdate((*m_client_it)->m_name, false);
             if (m_sampleRuns.contains(*m_client_it))

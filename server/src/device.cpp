@@ -27,21 +27,22 @@ Device::Device(QObject* parent, const QString& clientName)
       m_udp(new QUdpSocket(this)),
       m_lock(clientName.toStdString())
 {
+    m_logName = apputils::DeviceLabel(clientName.toStdString());
     m_offsetMeasurementHistory = new OffsetMeasurementHistory;
     if (!m_server->listen())
     {
-        trace->critical("{}unable to start device server", getLogName());
+        trace->critical("{} unable to start device server", getLogName());
         return;
     }
 
     m_measurementSeries = new BasicMeasurementSeries(getLogName());
     m_serverAddress = Interface::getLocalAddress().toString();
     m_clientUdpPort = m_server->serverPort();
-    trace->info("{}bind udp to local {}:{}", getLogName(), m_serverAddress.toStdString(), m_clientUdpPort);
+    trace->info("{} bind udp to local {}:{}", getLogName(), m_serverAddress.toStdString(), m_clientUdpPort);
     m_udp->bind(QHostAddress(m_serverAddress), m_clientUdpPort);
     connect(m_udp, SIGNAL(readyRead()), this, SLOT(slotUdpRx()));
 
-    trace->info("{}started tcp server on {}:{}",
+    trace->info("{} started tcp server on {}:{}",
                 getLogName(),
                 m_serverAddress.toStdString(),
                 m_server->serverPort());
@@ -52,7 +53,7 @@ Device::Device(QObject* parent, const QString& clientName)
     m_clientPingTimer = startTimer(500);
     m_clientPingCounter = g_serverPingPeriod / 500;
 
-    connect(&m_lock, &Lock::signalNewLockState, this, &Device::slotNewLockState);
+    connect(&m_lock, &Lock::signalNewLockAndQuality, this, &Device::slotUpdatedLockAndQuality);
 }
 
 
@@ -83,10 +84,11 @@ void Device::sendServerTimeUDP()
         }
     }
 
-    int64_t epoch = s_systemTime->getUpdatedSystemTime();
-    m_udp->writeDatagram((const char *) &epoch, sizeof(int64_t), m_clientAddress, m_clientTcpPort);
     m_clientPingCounter = g_serverPingPeriod / 500;
     m_statusReport.packetSentOrReceived();
+
+    int64_t epoch = s_systemTime->getUpdatedSystemTime();
+    m_udp->writeDatagram((const char *) &epoch, sizeof(int64_t), m_clientAddress, m_clientTcpPort);
 }
 
 
@@ -261,7 +263,7 @@ void Device::processMeasurement(const RxPacket& rx)
         if (std::fabs(ppm) > ppmLimit)
         {
             double newppm = ppm >= ppmLimit ? ppmLimit : -ppmLimit;
-            trace->warn("{}large ppm adjustment value {} truncated to {}", getLogName(), ppm, newppm);
+            trace->warn("{} large ppm adjustment value {} truncated to {}", getLogName(), ppm, newppm);
             ppm = newppm;
         }
 
@@ -272,10 +274,9 @@ void Device::processMeasurement(const RxPacket& rx)
     }
 
     std::string extra = m_initState != RUNNING ? " (wait)" : "";
-    extra += " " + name();
     if (measurement.resultCode() != OffsetMeasurement::PASS)
     {
-        extra += OffsetMeasurement::ResultCodeAsString(measurement.resultCode());
+        extra += " (" + OffsetMeasurement::ResultCodeAsString(measurement.resultCode()) + ")";
     }
 
     m_previousClientOffset_ns = clientoffset_us;
@@ -283,10 +284,12 @@ void Device::processMeasurement(const RxPacket& rx)
     double average_offset = m_initState == InitState::RUNNING ? m_avgClientOffset_ns : 0.0;
 
     std::string message = fmt::format(
-                WHITE "{}{:-3d} runtime {:5.1f} roundtrip_us {:5.1f} "
+                WHITE "{} {} runtime {:5.1f} roundtrip_us {:5.1f} "
                       "sd_us {:5.1f} period_sec {:2} silence_sec {:2} samples {:4} avgoffs_us {:5.1f} "
                       "offset_us " YELLOW "{:5.1f}" RESET "{}",
-                getLogName(), m_offsetMeasurementHistory->getCounter(), s_systemTime->getRunningTime_secs(),
+                getLogName(),
+                m_offsetMeasurementHistory->getCounter(),
+                s_systemTime->getRunningTime_secs(),
                 roundtrip_us,
                 m_offsetMeasurementHistory->getSD_us(),
                 m_lock.getMeasurementPeriod_sec(), m_lock.getInterMeasurementDelaySecs(), m_lock.getNofSamples(),
@@ -303,7 +306,7 @@ void Device::processMeasurement(const RxPacket& rx)
         DataFiles::fileApp(filename, message);
     }
 
-    trace->debug("{}cli2ser_us {:7.3f} ser2cli_us {:7.3f} spacing_sec {}",
+    trace->debug("{} cli2ser_us {:7.3f} ser2cli_us {:7.3f} spacing_sec {}",
                  getLogName(), local_us, client_us, m_lock.getInterMeasurementDelaySecs());
 
     if (m_udpOverruns > 10)
@@ -348,8 +351,8 @@ void Device::processMeasurement(const RxPacket& rx)
 
         tcpTx(json);
 
-        trace->info("{}adjusting client system time with {} ns and setting ppm to {:7.3f}",
-                    getLogName(), client_adjustment_ns, ppm);
+        trace->info("{} adjusting client system time with {} us and setting ppm to {:7.3f}",
+                    getLogName(), client_adjustment_ns/1000.0, ppm);
 
         m_offsetMeasurementHistory->reset();
         m_initState = InitState::RUNNING;
@@ -375,11 +378,9 @@ void Device::processMeasurement(const RxPacket& rx)
         }
     }
 
-    QJsonObject json;
-    json["name"] = m_name;
-    json["command"] = "connection_info";
-    json["loss"] = QString::number(measurement.packageLossPct());
-    emit signalWebsocketTransmit(json);
+    m_packageLossPct = measurement.packageLossPct();
+
+    transmitLockAndQuality();
 }
 
 
@@ -423,7 +424,7 @@ void Device::tcpTx(const QJsonObject& json)
 
     if (!m_tcpSocket)
     {
-        trace->error("{}cant write to socket with no client", getLogName());
+        trace->error("{} can't write to socket with no client", getLogName());
         return;
     }
 
@@ -432,7 +433,7 @@ void Device::tcpTx(const QJsonObject& json)
     // segfault seen here (during debugging). dunno how to avoid that.
     if (!m_tcpSocket->isWritable())
     {
-        trace->warn("{}tcp socket not writable?", getLogName());
+        trace->warn("{} tcp socket not writable?", getLogName());
         clientDisconnected();
         return;
     }
@@ -499,7 +500,7 @@ void Device::slotTcpRx()
                 m_measurementCollisionNotice = false;
                 if (delay_sec > 10)
                 {
-                    trace->info("measurement collision {}, offsetting next measurement", name());
+                    trace->info("{} measurement collision, offsetting next measurement", getLogName());
                 }
                 delay_sec -= 2;
             }
@@ -523,7 +524,7 @@ void Device::slotTcpRx()
             bool clientValid = result == OffsetMeasurement::ResultCodeAsString(OffsetMeasurement::PASS);
             if (!clientValid)
             {
-                trace->warn("{}client measurement is invalid ({}), retrying..", getLogName(), result);
+                trace->warn("{} client measurement is invalid ({}), retrying..", getLogName(), result);
                 m_lock.panic();
                 sampleRunComplete();
             }
@@ -577,13 +578,46 @@ void Device::slotUdpRx()
 }
 
 
-void Device::slotNewLockState(Lock::LockState lockState)
+QJsonObject Device::getLockAndQuality() const
 {
-    QJsonObject json;
-    json["name"] = m_name;
-    json["command"] = "lockstateupdate";
-    json["lockstate"] = Lock::toString(lockState).c_str();
-    emit signalWebsocketTransmit(json);
+    auto json = QJsonObject();
+    json["command"] = "timesync_update";
+    json["from"] = m_name;
+    json["connected"] = m_clientConnected;
+
+    if (m_clientConnected)
+    {
+        auto jsonConn = QJsonObject();
+        jsonConn["loss"] = m_packageLossPct;
+        jsonConn["value"] = m_lock.getQuality();
+        jsonConn["quality"] = m_lock.getQualityPct();
+        jsonConn["lockstate"] = Lock::toString(m_lock.getLockState()).c_str();
+        json["metrics"] = jsonConn;
+    }
+
+    return json;
+}
+
+
+void Device::transmitLockAndQuality(bool force)
+{
+    auto message = getLockAndQuality();
+    if (force or message != m_lastLockAndQualityMessage)
+    {
+        if (message.contains("metrics"))
+        {
+            auto metrics = message["metrics"].toObject();
+            trace->trace("{} new {}", metrics["lockstate"].toString().toStdString());
+        }
+        emit signalWebsocketTransmit(message);
+        m_lastLockAndQualityMessage = message;
+    }
+}
+
+
+void Device::slotUpdatedLockAndQuality()
+{
+    transmitLockAndQuality();
 }
 
 
@@ -625,7 +659,7 @@ void Device::measurementStart()
     json["samples"] = QString::number(count);
     tcpTx(json);
 
-    trace->debug("{}starting sample run with {} samples and period_ms {} (slept {} secs)",
+    trace->debug("{} starting sample run with {} samples and period_ms {} (slept {} secs)",
                  getLogName(), count, m_lock.getSamplePeriod_ms(), m_lock.getInterMeasurementDelaySecs());
     emit signalRequestSamples(this, count, m_lock.getSamplePeriod_ms());
 }
@@ -640,7 +674,7 @@ void Device::sampleRunComplete()
 
 std::string Device::getLogName() const
 {
-    return fmt::format("[{:<8}] ", m_name.toStdString());
+    return m_logName;
 }
 
 
@@ -652,7 +686,7 @@ std::string Device::name() const
 
 void Device::slotSendStatus()
 {
-    slotNewLockState(m_lock.getLockState());
+    transmitLockAndQuality(true);
 }
 
 
@@ -664,18 +698,21 @@ void Device::slotClientConnected()
     m_clientAddress = QHostAddress(m_tcpSocket->peerAddress().toIPv4Address());
     m_clientTcpPort = m_tcpSocket->peerPort();
 
-    trace->info(IMPORTANT "{}connected from {}:{}" RESET,
+    trace->info(IMPORTANT "{} connected from {}:{}" RESET,
                 getLogName(), m_clientAddress.toString().toStdString(), m_clientTcpPort);
 
     connect(m_tcpSocket, &QTcpSocket::readyRead, this, &Device::slotTcpRx);
 
     connect(m_tcpSocket, &QAbstractSocket::disconnected,
             m_tcpSocket, &QObject::deleteLater);
+
+    transmitLockAndQuality(true);
 }
 
 
 void Device::clientDisconnected()
 {
     m_clientConnected = false;
+    transmitLockAndQuality(true);    // fixit rename
     emit signalConnectionLost(m_name);
 }

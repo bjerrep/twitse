@@ -6,8 +6,16 @@ After=network-online.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=<git root>
-ExecStart=<git root>/bin/twitse_client --id <name>
+WorkingDirectory=<twitseroot>
+
+# Dont start before wireless is -really- online....
+ExecStartPre=/usr/lib/systemd/systemd-networkd-wait-online --interface=wlan0  -o routable
+
+# plain start
+ExecStart=<twitseroot>/bin/twitse_client --id <groupname:devicename>
+# starting under screen. Attach with 'screen -r twitse_client'.
+# ExecStart=/usr/bin/screen -fn -L -DmS twitse_client /usr/bin/sh -c '<twitseroot>/bin/twitse_client --id <groupname:devicename> ]; exec /usr/bin/bash'
+
 Restart=always
 
 [Install]

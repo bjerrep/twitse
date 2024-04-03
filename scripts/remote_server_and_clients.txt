@@ -1,2 +1,0 @@
-SERVER="alarm@ludit"
-CLIENTS="ludit@twitseleft ludit@twitseright ludit@stereo-left ludit@stereo-right"

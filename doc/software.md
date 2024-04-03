@@ -17,12 +17,14 @@ It appears that time measurements are influenced whenever the wifi connection de
     RPI onboard     65   65   65   65   65    65   65    65   65   65   65   65   65
     RT5572          78   78   78   104  104  19.5  104   104  78   78   104  104  78
 
-(while sleep 10; do iwconfig wlan0 | sed -n 's/Bit Rate=\(.*\)/\1/p' | awk '{print $1}'; done)
+
+	while sleep 10; do iwconfig wlan0 | sed -n 's/Bit Rate=\(.*\)/\1/p' | awk '{print $1}'; done
+
 Using an adaptor as the Ralink is perfectly possible, it will just be a little more noisy compared to e.g. the onboard RPI wifi. It should be possible to force a wifi connection to run with a fixed bitrate but so far that has been an exercise in futility. Talking about time measurement quality then don't forget to turn off wifi power save or the time measurements might end up on a different planet.
 
 There are no documentation, only the source code. And its probably not funny to try to decipher. The client/server design is a moving target and the split between tasks done by a client vs the server renders intuition useless.
 
-The solution here uses plain UDP for time measurements. This means that the network traffic will increase linearly with the number of clients which is not a good thing. Initial experiments with multicast only demonstrated how bad this was compared to UDP but another day might bring new multicast experiments.
+The solution here uses plain UDP for time measurements. This means that the network traffic will increase linearly with the number of clients which is not a good thing. Initial experiments with multicast only demonstrated how bad this was compared to UDP but another day might bring new multicast experiments.  Twitse is currently running a multiroom setup with two stereo setups. This gives a total of 4 clients and has so far not given any problems on a family network.
 
 It takes a lot of time to get comfortable playing with timing software like this since it is so inhumanly slow to test or verify anything. Only the extremely patient should ever try to play with timing software development.
 

@@ -16,7 +16,7 @@ const bool VCTCXO_MODE = false;
 
 #define INLINE __attribute__((always_inline))
 
-ISUSED static const char* g_multicastIp = "225.168.1.102";
+ISUSED static const char* g_multicastIp = "224.0.0.234";
 const uint16_t g_multicastPort = 45654;
 
 const uint16_t g_websocketPort = 12343;
@@ -52,7 +52,7 @@ enum DevelopmentMask
 {
     None                        = 0x00,
     SameHost                    = 0x01,
-    SaveOnBailingOut                = 0x02,
+    SaveOnBailingOut            = 0x02,
     AnalysisAppendToSummary     = 0x04,
     SaveMeasurements            = 0x08,
     SaveClientSummaryLines      = 0x10,

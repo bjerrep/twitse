@@ -32,8 +32,8 @@ An ordinary ping can test multicast as well. On a client run
 
 then the client will respond to multicast pings. On the server run e.g.
 
-	ping 225.168.1.102
-	
+	ping 224.0.0.234
+
 which for the same setup will once more yield measurements in the 20-200 ms range.
 
 http://www.wireless-nets.com/resources/tutorials/802.11_multicasting.html

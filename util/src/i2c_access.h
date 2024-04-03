@@ -10,9 +10,11 @@ public:
 
     void exit();
 
-    double readTemperature();
+    bool readTemperature(double& temperature);
 
     void setFixedVCTCXO_DAC(bool fixed);
+
+    bool getFixedVCTCXO_DAC() const;
 
     void writeVCTCXO_DAC(uint16_t dac);
 

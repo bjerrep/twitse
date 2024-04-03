@@ -9,7 +9,7 @@ class Lock : public QObject
 {
     Q_OBJECT
 
-    const static int QUALITY_LEVELS = 12;
+    const static int QUALITY_LEVELS = 11;  // 0 (worst) - 10 (best)
 
 #ifdef VCTCXO
     const int MIN_SAMPLE_INTERVAL_ms = 10;
@@ -48,6 +48,7 @@ public:
     int getMeasurementPeriod_sec() const;
     int getNofSamples() const;
     int getQuality() const;
+    int getQualityPct(int quality = -1) const;
     Distribution getDistribution() const;
     LockState update(double offset);
     void panic();
@@ -59,8 +60,7 @@ public:
     void setFixedSamplePeriod_ms(int ms);
 
 signals:
-    void signalNewLockState(LockState lockState);
-    void signalNewLockQuality(const QString& name);
+    void signalNewLockAndQuality();
 
 private:
     LockState m_lockState = UNLOCKED;
@@ -75,7 +75,6 @@ private:
     static int s_clientSamples;
     int m_fixedSamplePeriod_ms = -1;
 
-    const int Samples[QUALITY_LEVELS] = {500, 450, 400, 360, 330, 300, 270, 250, 230, 220, 210, 200};
-    const int Seconds[QUALITY_LEVELS] = {  5,   7,  10,  15,  22,  32,  45,  50,  60,  75,  90, 110};
-
+    const int Samples[QUALITY_LEVELS] = {500, 450, 400, 360, 330, 290, 255, 235, 220, 210, 200};
+    const int Seconds[QUALITY_LEVELS] = {  5,   7,  10,  15,  22,  32,  45,  60,  75,  90, 110};
 };

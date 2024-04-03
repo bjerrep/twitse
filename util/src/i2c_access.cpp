@@ -80,7 +80,7 @@ void I2C_Access::writeLTC2606IDD1(uint16_t value)
 }
 
 
-double I2C_Access::readTemperature()
+bool I2C_Access::readTemperature(double &temperature)
 {
     uint8_t temperaturePointer = 0;
     int16_t reading;
@@ -110,17 +110,21 @@ double I2C_Access::readTemperature()
 
     if (ioctl(m_descriptor, I2C_RDWR, &data) < 0)
     {
-        trace->warn("luhab board temperature reading failed");
-        return 0.0;
+        return false;
     }
 
-    double temperature = __bswap_16(reading) / 256.0;
-    return temperature;
+    temperature = __bswap_16(reading) / 256.0;
+    return true;
 }
 
 void I2C_Access::setFixedVCTCXO_DAC(bool fixed)
 {
     m_fixed_dac = fixed;
+}
+
+bool I2C_Access::getFixedVCTCXO_DAC() const
+{
+    return m_fixed_dac;
 }
 
 void I2C_Access::writeVCTCXO_DAC(uint16_t dac)

@@ -3,11 +3,13 @@
 # Twitse
 
 ## The wireless time sync experiment
-This project is an experimental playground for getting wireless raspberry pi clients and a wired raspberry pi server running with 'pretty good' time synchronization between server and clients. The measured time offsets generally lie in the sub-50 microsecond domain which is not too bad given that there is wifi connections in the mix.
+This project is an experimental playground for getting multiple wireless raspberry pi clients and a wired raspberry pi server running with 'pretty good' time synchronization between server and clients. The measured time offsets generally lie in the sub-50 microsecond domain which is not too bad given that there is wifi connections in the mix.
 
-The reason behind this project was to develop a diy timing framework for playing audio on multiple wireless raspberry pi clients, where e.g. two clients could be playing either right or left channel of a stereo signal, controlling an active speaker each. The accuracy actually required for such an audio setup is not part of the project here, for now its just about getting a feel for the obtainable timing accuracy in a minimal wireless setup.
+The reason behind this project was to develop a diy timing framework for playing lossless audio on multiple wireless raspberry pi clients, where e.g. two clients could be playing either right or left channel of a stereo signal, controlling an active speaker each. The accuracy actually required for such an audio setup is not part of the project here, for now its just about getting a feel for the obtainable timing accuracy in a minimal wireless setup.
 
-The Twitse project is both a hardware and a software project. The software is available here, the hardware design not so much, at least not yet. The client part of the software is intended to control a VCTCXO crystal oscillator, replacing the normal 19.2MHz raspberry pi crystal on the clients. This way the clients are kept in time sync down to and including the physical Raspberry Pi hardware. Since this is probably a little too steep for most, Twitse can also run in a pure software mode for playing around. In software mode the clients and server are in time sync in the software alone which is used by the clients to periodically adjust their wallclock.
+The Twitse project is both a hardware and a software project. The software is available here, the hardware design not so much, at least not yet. Both server and clients boards have their standard 19.2MHz X1 raspberry pi crystals replaced with DAC controlled VCTCXO oscillators. This way the software are able to adjust the coreclock on the clients meaning that the clients are kept in time sync down to and including the physical Raspberry Pi hardware. The server is using the VCTCXO to let the wallclock track NTP time.
+
+Since this is probably a little too steep for most, Twitse can also run in a pure software mode for playing around. In software mode the clients and server are in time sync in the software alone which is used by the clients to periodically adjust their wallclock.
 
 The following graph shows little over an hour of measurements on a plain 2.4GHz wifi for a single client. The purple graph is the measured time offsets, and the green lines indicate how often a measurement is made and the number of UDP packets used at each measurement. Given the awful latencies of a wireless connection it doesn't look too bad to have a graph in the microsecond domain. Its worth pointing out that this is the measured time offsets which will consist of the real offsets plus measurement noise. Since there is definitely measurement noise its probably safe to assume that the real offsets are lower than the graph suggests. The steady state finally reached with regard to network load currently uses 200 samples once every minute to keep the offsets under wraps.
 
@@ -24,11 +26,11 @@ A note about accuracy and quality: there is not necessarily anything impressive 
 
 ## More words
 
-[here](doc/software.md) (for the software only mode on unmodified raspberry pi) 
+[Twitse software only mode on unmodified raspberry pi](doc/software.md) 
 
 and 
 
-[here](doc/VCTCXO.md) (for the VCTCXO mode with hardware modified raspberry pi and VCTCXO carrier board).
+[Twitse for hardware modified raspberry pi and VCTCXO carrier board](doc/VCTCXO.md).
 
 <br /><br /><br />
 
@@ -51,5 +53,24 @@ https://raspberrypi.stackexchange.com/questions/74482/switch-out-the-x1-oscillat
 Terradak TCXO RPI HAT: A audio player HAT with two TCXO oscillators intended to replace both the 19.2 and 25.0 MHz crystals on a RPI 3B+. The page has some pictures of the RPI showing the pads the xtal feeds should go to.
 https://www.teradak.com/products/115.html
 
+PTP IEEE-1588 implementation that runs on the raspberry pi using time-stamping in software.
+https://github.com/twteamware/raspberrypi-ptp>
 
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/1f1ddf68d54641658fba20d23c885ad3)](https://www.codacy.com/app/bjerrep/twitse?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=bjerrep/twitse&amp;utm_campaign=Badge_Grade)
+Switch out the X1 Oscillator on a RPI 2/3. Cool measurements on stock crystal vs. a TCXO replacement.
+https://raspberrypi.stackexchange.com/questions/74482/switch-out-the-x1-oscillator-on-a-rpi-2-3
+
+"Sync up your clocks! Better PTP settings on Raspberry Pi". More on software PTP on a RPI with a lot of measurement graphs. Still only wired tests though. Mentions a kernel switch called "nohz=off" which calls for an experiment someday.
+https://vejipe.medium.com/sync-your-clocks-better-ptp-settings-on-raspberry-pi-37a9a54e4802
+
+PPS-Client, microsecond precision with a GPS (pulse-per-second) module on raspberry pi.
+
+https://github.com/rascol/PPS-Client
+
+The Raspberry Pi CM4 NIC (BCM54210PE) has PTP support. https://www.jeffgeerling.com/blog/2022/ptp-and-ieee-1588-hardware-timestamping-on-raspberry-pi-cm4
+
+Switch out the X1 Oscillator on a RPI 2/3 (for better stability) (pictures and TCXO/OCXO)
+
+https://raspberrypi.stackexchange.com/questions/74482/switch-out-the-x1-oscillator-on-a-rpi-2-3
+
+Clocks and PLLs on rasberry pi from https://elinux.org/The_Undocumented_Pi#Clocks
+

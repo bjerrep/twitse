@@ -4,16 +4,20 @@
 #include "interface.h"
 #include "system.h"
 #include "defaultdac.h"
+#include "ntpcheck.h"
 
 #include <csignal>
 #include <execinfo.h>
 #include <QCoreApplication>
 #include <QCommandLineParser>
+#include <QLockFile>
+#include <QDir>
 
 std::shared_ptr<spdlog::logger> trace = spdlog::stdout_color_mt("console");
 
 int g_developmentMask = DevelopmentMask::None;
 int g_randomTrashPromille = 0;
+QLockFile lockFile(QDir::temp().absoluteFilePath("twitse_server.lock"));
 
 void signalHandler(int signal)
 {
@@ -24,14 +28,27 @@ void signalHandler(int signal)
     exit(EXIT_FAILURE);
 }
 
+void signalCtrlCHandler(int signal)
+{
+    lockFile.unlock();
+    QCoreApplication::exit(1);
+}
+
 
 int main(int argc, char *argv[])
 {
     spdlog::set_level(spdlog::level::debug);
     spdlog::set_pattern(logformat);
 
+    if(!lockFile.tryLock(0))
+    {
+        trace->critical("another instance of twitse_server is already running");
+        exit(1);
+    }
+
     signal(SIGSEGV, signalHandler);
     signal(SIGABRT, signalHandler);
+    signal(SIGINT, signalCtrlCHandler);
 
     QCoreApplication app(argc, argv);
 
@@ -53,7 +70,7 @@ int main(int argc, char *argv[])
        {"loglevel", "0:error 1:info(default) 2:debug 3:all", "loglevel"},
        {"samehost", "both server and client runs on the same host, accept unexpected measurements"},
        {"ntp_nowait", "(vctcxo) don't wait for ntp sync"},
-       {"turbo", "a development speedup mode with fast (and poor) measurements"},
+       {"turbo", "a development speedup mode with among others fast (and poor) measurements"},
        {"trash", "in a not very structured way randomly trash a random promille of samples (integer)", "promille"}
     });
     parser.process(app);
@@ -114,26 +131,13 @@ int main(int argc, char *argv[])
 
     if (VCTCXO_MODE && !parser.isSet("ntp_nowait"))
     {
-        // Wait for ntp to get synced if it isn't. This is experimental, the
-        // proper solution would probably be that the server didn't
-        // start before ntp was up and running (?)
-        //
-        for (int i = 1; i <= 10; i++)
+        //fixit "0.arch.pool.ntp.org"; //"us.pool.ntp.org"
+        if (!ntp_check("0.arch.pool.ntp.org", 10))
         {
-            if (!System::ntpSynced())
-            {
-                trace->info("waiting for ntp sync {}:10", i);
-                sleep(1);
-            }
+            trace->critical("ntp failure, bailing out");
+            exit(1);
         }
-        if (!System::ntpSynced())
-        {
-            trace->error("giving up waiting for ntp sync");
-        }
-        else
-        {
-            trace->info("ntp is in sync, nice");
-        }
+        trace->info("ntp is running");
     }
 
     Server server(&app, address, port);

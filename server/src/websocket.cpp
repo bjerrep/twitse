@@ -56,7 +56,7 @@ WebSocketJson WS_Measurements::finalizePeriod(int64_t msec)
     m_lastPeriod.clear();
 
     auto json = new QJsonObject();
-    (*json)["name"] = "server";
+    (*json)["from"] = "server";
     (*json)["command"] = "max_delta_offset";
     (*json)["time"] = QString::number(msec);
     (*json)["value"] = m_largestDiff;
@@ -81,7 +81,7 @@ WebSocketJson WS_Measurements::finalizePeriod(int64_t msec)
 WebSocketJson WS_Measurements::getJson() const
 {
     auto json = new QJsonObject();
-    (*json)["name"] = "server";
+    (*json)["from"] = "server";
     (*json)["command"] = "max_delta_offset_history";
 
     double mean_us = 0.0;
@@ -122,13 +122,13 @@ WebSocket::WebSocket(uint16_t port)
     if (success)
     {
         connect(m_webSocket, &QWebSocketServer::newConnection, this, &WebSocket::slotNewConnection);
-        trace->info("websocket started at port {}", port);
+        trace->info("websocket server started at port {}", port);
     }
     else
     {
         delete m_webSocket;
         m_webSocket = nullptr;
-        trace->critical("websocket failed");
+        trace->critical("websocket server on port {} failed", port);
     }
 
     m_startTime_ms = SystemTime::getWallClock_ns() / NS_IN_MSEC;
@@ -138,6 +138,7 @@ WebSocket::WebSocket(uint16_t port)
 
 WebSocket::~WebSocket()
 {
+    m_webSocket->close();
     delete m_webSocket;
 }
 
@@ -159,7 +160,7 @@ void WebSocket::slotNewOffsetMeasurement(const QString &id, double offset_us, do
 
     auto json = new QJsonObject;
     (*json)["command"] = "current_offset";
-    (*json)["name"] = id;
+    (*json)["from"] = id;
     (*json)["time"] = QString::number(now_ms);
     (*json)["value"] = QString::number(offset_us);
     (*json)["meanabsdev"] = QString::number(mean_abs_dev);
@@ -199,7 +200,7 @@ void WebSocket::broadcast(const QByteArray& data)
 void WebSocket::sendWallOffset()
 {
     auto json = new QJsonObject;
-    (*json)["name"] = "server";
+    (*json)["from"] = "server";
     (*json)["command"] = "walloffset";
 
     double diff_sec = (s_systemTime->getRawSystemTime_ns() - SystemTime::getWallClock_ns()) / NS_IN_SEC_F;
@@ -292,7 +293,7 @@ void WebSocket::slotDisconnected()
 }
 
 
-void WebSocket::transmit(const QJsonObject &json) /// fixit why slot ?
+void WebSocket::transmit(const QJsonObject &json)
 {
     QJsonDocument doc(json);
     broadcast(doc.toJson());

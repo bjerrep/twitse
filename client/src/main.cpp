@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
     parser.addHelpOption();
     parser.addOptions({
                           {"port", "multicast port", "port"},
-                          {"id", "client name", "id"},
+                          {"id", "client name in the form group:device", "id"},
                           {"noclockadj", "dont adjust the clock"},
                           // can be set at runtime with control application
                           {"fixedadjust", "use a fixed ppm value", "fixedadjust"},
@@ -67,9 +67,9 @@ int main(int argc, char *argv[])
     }
 
     QString id = parser.value("id");
-    if (id.isEmpty())
+    if (id.count(":") != 1)
     {
-        trace->critical("need a unique identifier (--id)");
+        trace->critical("need a unique identifier in the form group:device (--id)");
         exit(1);
     }
 

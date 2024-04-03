@@ -20,3 +20,10 @@ void timerOn(QObject* host, int& timerId, int period)
     timerOff(host, timerId);
     timerId = host->startTimer(period);
 }
+
+
+
+std::string apputils::DeviceLabel(const std::string& devicename)
+{
+    return fmt::format("[{:<15}", devicename + "]");
+}

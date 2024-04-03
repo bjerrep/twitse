@@ -20,6 +20,7 @@ class DeviceManager : public QObject
 
 public:
     DeviceManager();
+    ~DeviceManager();
 
     void initialize();
 
@@ -50,5 +51,5 @@ private:
     Samples m_samples;
     bool m_multicastTime = false;
     QVector<QString> m_activeClients;
-    WebSocket* m_webSocket;
+    WebSocket* m_webSocket = nullptr;
 };

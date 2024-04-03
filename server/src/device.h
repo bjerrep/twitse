@@ -95,6 +95,8 @@ public:
     void getClientOffset();
     std::string getStatusReport();
     void measurementCollisionNotice();
+    QJsonObject getLockAndQuality() const;
+    void transmitLockAndQuality(bool force = false);
 
 private:
     void clientDisconnected();
@@ -115,10 +117,11 @@ private slots:
     void slotTcpRx();
     void slotClientConnected();
     void slotUdpRx();
-    void slotNewLockState(Lock::LockState m_lockState);
+    void slotUpdatedLockAndQuality();
 
 public:
     QString m_name;
+    std::string m_logName;
     QTcpServer* m_server;
     QByteArray m_tcpReadBuffer;
     QTcpSocket *m_tcpSocket;
@@ -147,6 +150,8 @@ public:
     double m_avgClientOffset_ns = 0.0;
     double m_previousClientOffset_ns = 0.0;
     Lock m_lock;
+    QJsonObject m_lastLockAndQualityMessage;
+    double m_packageLossPct = 0.0;
     StatusReport m_statusReport;
 
     int m_fixedSamplePeriod_ms = -1;
