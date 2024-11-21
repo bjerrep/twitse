@@ -86,14 +86,20 @@ Client::Client(QCoreApplication *parent, const QString& id,
 
     m_SystemTimeRefreshTimer = startTimer(TIMER_20MS);
     // Outcomment to disable gradual DAC adjustments.
-    m_DACadjustmentTimer = startTimer(TIMER_1SEC);
+    if (VCTCXO_MODE)
+    {
+        m_DACadjustmentTimer = startTimer(TIMER_1SEC);
+    }
 }
 
 
 Client::~Client()
 {
     delete m_measurementSeries;
-    I2C_Access::I2C()->exit();
+    if (VCTCXO_MODE)
+    {
+        I2C_Access::I2C()->exit();
+    }
 }
 
 
@@ -170,9 +176,15 @@ void Client::multicastRx(const MulticastRxPacket& rx)
         }
     }
 
-    if (rx.value("from") == m_id || ((rx.value("to") != m_id && rx.value("to") != "all")))
+    if (rx.value("from") == m_id)
     {
-        trace->trace("rx multicast (discarded): {}", rx.toString().toStdString());
+        // this is our own message
+        return;
+    }
+
+    if (rx.value("to") != m_id && rx.value("to") != "all")
+    {
+        trace->trace("rx multicast discarded, was for {}: {}", rx.value("to").toStdString(), rx.toString().toStdString());
         return;
     }
 
@@ -309,6 +321,8 @@ void Client::tcpRx()
 
         QString command = rx.value("command");
 
+        trace->debug("rx '{}'", command.toStdString());
+
         if (command == "sampleruncomplete")
         {
             transmitClientReady();
@@ -319,7 +333,7 @@ void Client::tcpRx()
             m_expectedNofSamples = rx.value("samples").toInt();
             trace->debug("measurement started");
         }
-        else if (command == "sendforwardoffset")
+        else if (command == "clientoffsetmeasurement")
         {
             if (m_udpOverruns > 10)
             {
@@ -328,12 +342,12 @@ void Client::tcpRx()
             m_udpOverruns = 0;
 
             QJsonObject json;
-            json["command"] = "forwardoffset";
+            json["command"] = "clientoffsetmeasurement";
             OffsetMeasurement offsetMeasurement = finalizeMeasurementRun();
             json["offset"] = QString::number(offsetMeasurement.m_offset_ns);
             json["valid"] = QString(OffsetMeasurement::ResultCodeAsString(offsetMeasurement.resultCode()).c_str());
 
-            trace->trace("send forwardoffset {} ns, result {}",
+            trace->debug("measurement completed, sending offset {} ns, result {}",
                          offsetMeasurement.m_offset_ns,
                          OffsetMeasurement::ResultCodeAsString(offsetMeasurement.resultCode()));
             tcpTx(json);
@@ -369,9 +383,6 @@ void Client::tcpRx()
                 {
                     trace->info(WHITE "not adjusting clock" RESET);
                 }
-                QJsonObject json;
-                json["command"] = "clockadjusted";
-                tcpTx(json);
 
                 double local_ppm = m_offsetMeasurementHistory.getPPM();
                 //double server_ppm = rx.value("set_ppm").toDouble();
@@ -389,6 +400,11 @@ void Client::tcpRx()
                 s_systemTime->setWallclock_ns(s_systemTime->getRawSystemTime_ns() + wall_offset);
                 trace->info("adjusting wallclock to {}", SystemTime::getWallClock_ns());
             }
+
+            QJsonObject json;
+            json["command"] = "clockadjusted";
+            tcpTx(json);
+
             m_offsetMeasurementHistory.reset();
         }
         else if (command == "adjustppm")
@@ -403,6 +419,12 @@ void Client::tcpRx()
         {
             int64_t offset_ns = rx.value("offset_ns").toLongLong();
             s_systemTime->setWallclock_ns(SystemTime::getWallClock_ns() - offset_ns);
+        }
+        else if (command == "server_vctcxo_adjusted")
+        {
+            int LSB = rx.valueInt("relative_lsb");
+            trace->info("following {} LSB vctcxo NTP adjustment on server", LSB);
+            I2C_Access::I2C()->relativeAdjustVCTCXO_DAC(LSB);
         }
         else
         {
@@ -419,6 +441,7 @@ void Client::tcpTx(const QJsonObject &json)
         trace->warn("not connected, tcp tx ignored");
         return;
     }
+    trace->trace("tx '{}'", json["command"].toString().toStdString());
     TcpTxPacket tx(json);
     m_tcpSocket.write(tx.getData());
 }
@@ -561,8 +584,8 @@ void Client::timerEvent(QTimerEvent* timerEvent)
                 {
                     diff_rate = diff > 0 ? 1 : -1;
                 }
-                I2C_Access::I2C()->adjustVCTCXO_DAC(diff_rate);
-                trace->debug("adjust dac gradual with {}", diff_rate);
+                I2C_Access::I2C()->relativeAdjustVCTCXO_DAC(diff_rate);
+                trace->trace("adjust dac gradual with {}", diff_rate);
             }
         }
     }
@@ -577,7 +600,7 @@ void Client::timerEvent(QTimerEvent* timerEvent)
             m_serverAlive = false;
             return;
         }
-        trace->error("**** server connection lost ****");
+        trace->error(WHITEONRED "  **** server connection lost ****  " RESET);
         reset("server lost");
     }
     else if (timerid == m_clientPingTimer)
@@ -637,7 +660,14 @@ OffsetMeasurement Client::finalizeMeasurementRun()
     if (summary.resultCode() == OffsetMeasurement::PASS)
     {
         m_offsetMeasurementHistory.add(summary);
-        trace->info(m_offsetMeasurementHistory.clientToString(I2C_Access::I2C()->getVCTCXO_DAC()));
+        if (VCTCXO_MODE)
+        {
+            trace->info(m_offsetMeasurementHistory.clientToString(I2C_Access::I2C()->getVCTCXO_DAC()));
+        }
+        else
+        {
+            trace->info(m_offsetMeasurementHistory.clientToString(0));
+        }
     }
     else
     {
@@ -654,22 +684,3 @@ void Client::transmitClientReady()
     tcpTx("ready");
 }
 
-
-/* Messages between server & client
-
-client               server
-                  <- running
-                  <- (sending time)
-(sending time) ->
-                  ...
-              ...
-
-                  <- sendforwardoffset
-forwardoffset ->
-
-                  <- Optional: adjustclock
-clockadjusted ->
-
-                  <- sampleruncomplete
-ready          ->
-*/

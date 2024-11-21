@@ -26,20 +26,10 @@ Lock::Lock(std::string clientname)
 {
     m_clientName = apputils::DeviceLabel(clientname);
     trace->info("{} sample distribution is '{}'", m_clientName, m_distribution == BURST_SILENCE ? "burst/silence": "evenly distribution");
-    if (g_developmentMask & DevelopmentMask::TurboMeasurements)
-    {
-        m_maxSamples /= 5;
-    }
 }
 
 
-bool Lock::isHiLock() const
-{
-    return m_lockState == HILOCK;
-}
-
-
-bool Lock::isLock() const
+bool Lock::isLocked() const
 {
     return m_lockState != UNLOCKED;
 }
@@ -53,16 +43,17 @@ Lock::LockState Lock::getLockState() const
 
 int Lock::getInterMeasurementDelaySecs() const
 {
+    if (s_fixedMeasurementSilence_sec >= 0)
+    {
+        return s_fixedMeasurementSilence_sec;
+    }
+
     switch (m_distribution)
     {
     case EVENLY_DISTRIBUTED:
         return 0;
     case BURST_SILENCE:
-        if (s_fixedMeasurementSilence_sec >= 0)
-        {
-            return s_fixedMeasurementSilence_sec;
-        }
-        return std::max(Seconds[m_quality] - Samples[m_quality] * getSamplePeriod_ms() / 1000.0, 0.0);
+        return Seconds[m_quality];
     }
     return 0;
 }
@@ -80,7 +71,7 @@ int Lock::getSamplePeriod_ms() const
     case EVENLY_DISTRIBUTED:
         return (1000 * Seconds[m_quality]) / Samples[m_quality];
     case BURST_SILENCE:
-        return MIN_SAMPLE_INTERVAL_ms;
+        return BURST_SAMPLE_RATE_ms;
     }
     return 0;
 }
@@ -106,9 +97,15 @@ void Lock::setFixedSamplePeriod_ms(int ms)
 }
 
 
-int Lock::getMeasurementPeriod_sec() const
+int Lock::getMeasurementBurstSleepPeriod_sec() const
 {
     return Seconds[m_quality];
+}
+
+
+int Lock::getMeasurementDuration_ms() const
+{
+    return getNofSamples() * getSamplePeriod_ms();
 }
 
 
@@ -167,7 +164,7 @@ std::string Lock::toString(LockState state)
 }
 
 
-Lock::LockState Lock::update(double offset)
+Lock::LockState Lock::updateLockState(double offset)
 {
     LockState lockState = m_lockState;
     int quality = m_quality;

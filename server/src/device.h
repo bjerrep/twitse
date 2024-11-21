@@ -14,6 +14,7 @@
 #include <QByteArray>
 #include <QHostAddress>
 #include <QJsonObject>
+#include <QMutex>
 
 class OffsetMeasurementHistory;
 class MeasurementSeriesBase;
@@ -91,17 +92,17 @@ public:
     void processMeasurement(const RxPacket &rx);
 
     std::string name() const;
+    void measurementStartRequest();
     void measurementStart();
     void getClientOffset();
     std::string getStatusReport();
-    void measurementCollisionNotice();
     QJsonObject getLockAndQuality() const;
     void transmitLockAndQuality(bool force = false);
 
 private:
     void clientDisconnected();
     void timerEvent(QTimerEvent *event);
-    void sampleRunComplete();
+    void measurementFinalize();
     std::string getLogName() const;
 
 signals:
@@ -109,6 +110,8 @@ signals:
     void signalConnectionLost(QString name);
     void signalNewOffsetMeasurement(const QString&, double, double, double);
     void signalWebsocketTransmit(const QJsonObject& json);
+    void signalRequestMeasurementStart(Device *device);
+    void signalMeasurementFinalized(Device *device);
 
 public slots:
     void slotSendStatus();
@@ -126,7 +129,7 @@ public:
     QByteArray m_tcpReadBuffer;
     QTcpSocket *m_tcpSocket;
     int m_clientActiveTimer = TIMEROFF;
-    int m_sampleRunTimer = TIMEROFF;
+    int m_measurementSilencePeriodTimer = TIMEROFF;
     int m_clientPingTimer = TIMEROFF;
     int m_clientPingCounter = 0;
     QString m_serverAddress;
@@ -137,7 +140,7 @@ public:
     int m_udpOverruns = 0;
     bool m_clientConnected = false;
     bool m_clientActive = false;
-    bool m_measurementCollisionNotice = false;
+    bool m_measurementStarted = false;
 
     int m_initStateCounter = NOF_INITIAL_PPM_MEASUREMENTS;
     InitState m_initState = InitState::PPM_MEASUREMENTS;
@@ -153,6 +156,7 @@ public:
     QJsonObject m_lastLockAndQualityMessage;
     double m_packageLossPct = 0.0;
     StatusReport m_statusReport;
+    QMutex m_mutex;
 
     int m_fixedSamplePeriod_ms = -1;
     int m_saveOddMeasurementsThreshold_ns = 20000;

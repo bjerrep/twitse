@@ -19,6 +19,7 @@ int g_developmentMask = DevelopmentMask::None;
 int g_randomTrashPromille = 0;
 QLockFile lockFile(QDir::temp().absoluteFilePath("twitse_server.lock"));
 
+
 void signalHandler(int signal)
 {
     void *array[30];
@@ -28,10 +29,17 @@ void signalHandler(int signal)
     exit(EXIT_FAILURE);
 }
 
+
 void signalCtrlCHandler(int signal)
 {
     lockFile.unlock();
     QCoreApplication::exit(1);
+}
+
+
+void signalIgnoreSIGPIPE(int signal)
+{
+    printf("--------------- ignoring signal SIGPIPE ---------------");
 }
 
 
@@ -49,6 +57,7 @@ int main(int argc, char *argv[])
     signal(SIGSEGV, signalHandler);
     signal(SIGABRT, signalHandler);
     signal(SIGINT, signalCtrlCHandler);
+    signal(SIGPIPE, signalIgnoreSIGPIPE);
 
     QCoreApplication app(argc, argv);
 
@@ -131,7 +140,6 @@ int main(int argc, char *argv[])
 
     if (VCTCXO_MODE && !parser.isSet("ntp_nowait"))
     {
-        //fixit "0.arch.pool.ntp.org"; //"us.pool.ntp.org"
         if (!ntp_check("0.arch.pool.ntp.org", 10))
         {
             trace->critical("ntp failure, bailing out");

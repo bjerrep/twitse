@@ -15,6 +15,7 @@ public:
     virtual ~RxPacket();
 
     virtual QString toString() const;
+    int valueInt(const QString &key) const;
     QString value(const QString& key) const;
 
 private:

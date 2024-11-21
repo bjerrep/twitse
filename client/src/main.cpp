@@ -7,10 +7,14 @@
 #include <csignal>
 #include <execinfo.h>
 #include <QCommandLineParser>
+#include <QLockFile>
+#include <QDir>
+
 
 std::shared_ptr<spdlog::logger> trace = spdlog::stdout_color_mt("console");
 
 int g_developmentMask = DevelopmentMask::None;
+QLockFile lockFile(QDir::temp().absoluteFilePath("twitse_client.lock"));
 
 void signalHandler(int signal)
 {
@@ -44,12 +48,19 @@ int main(int argc, char *argv[])
     parser.addOptions({
                           {"port", "multicast port", "port"},
                           {"id", "client name in the form group:device", "id"},
-                          {"noclockadj", "dont adjust the clock"},
+                          {"loglevel", "0:error 1:info(default) 2:debug 3:all", "loglevel"},
+                          {"noclockadj", "Development: dont adjust the clock"},
                           // can be set at runtime with control application
-                          {"fixedadjust", "use a fixed ppm value", "fixedadjust"},
-                          {"loglevel", "0:error 1:info(default) 2:debug 3:all", "loglevel"}
+                          {"fixedadjust", "Development: use a fixed ppm value", "fixedadjust"},
+                          {"allowmultiple", "Development: allow multiple clients"},
                       });
     parser.process(app);
+
+    if(!parser.isSet("allowmultiple") && !lockFile.tryLock(0))
+    {
+        trace->critical("another instance of twitse_client is already running (see --allowmultiple)");
+        exit(1);
+    }
 
     uint16_t port = parser.value("port").toUShort();
     if (!port)

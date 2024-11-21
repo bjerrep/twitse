@@ -9,7 +9,7 @@
 #include <QTcpServer>
 #include <QJsonArray>
 
-DeviceManager::DeviceManager()
+DeviceManager::DeviceManager() : m_measurementSequencer(this)
 {
     connect(&m_samples, &Samples::signalSendTimeSample,
             this, &DeviceManager::slotSendTimeSample);
@@ -46,6 +46,15 @@ Device* DeviceManager::findDevice(const QString& name)
 const DeviceDeque &DeviceManager::getDevices() const
 {
     return m_deviceDeque;
+}
+
+
+void DeviceManager::broadcastToAllDevices(const QJsonObject& json)
+{
+    for(auto device : m_deviceDeque)
+    {
+        device->tcpTx(json);
+    }
 }
 
 
@@ -96,6 +105,8 @@ void DeviceManager::process(const MulticastRxPacket& rx)
         connect(newDevice, &Device::signalConnectionLost, this, &DeviceManager::slotConnectionLost);
         connect(newDevice, &Device::signalNewOffsetMeasurement, m_webSocket, &WebSocket::slotNewOffsetMeasurement);
         connect(newDevice, &Device::signalWebsocketTransmit, this, &DeviceManager::slotWebsocketTransmit);
+        connect(newDevice, &Device::signalRequestMeasurementStart, &m_measurementSequencer, &MeasurementSequencer::slotRequestMeasurementStart);
+        connect(newDevice, &Device::signalMeasurementFinalized, &m_measurementSequencer, &MeasurementSequencer::slotMeasurementFinalized);
         connect(m_webSocket, &WebSocket::signalNewWebsocketConnection, this, &DeviceManager::slotNewWebsocketConnection);
 
         QJsonObject json;
@@ -151,9 +162,13 @@ void DeviceManager::slotConnectionLost(const QString& client)
             m_samples.removeClient(client);
             Device* device = m_deviceDeque.takeAt(i);
             device->deleteLater();
-            trace->warn(RED "{} connection lost, removing client. Clients connected: {}" RESET,
+            trace->warn(RED "[{}] connection lost, removing client. Clients connected: {}" RESET,
                         client.toStdString(),
                         m_deviceDeque.size());
+            if (!m_deviceDeque.size())
+            {
+                m_measurementSequencer.reset();
+            }
             return;
         }
     }
@@ -175,7 +190,6 @@ void DeviceManager::slotWebsocketTransmit(const QJsonObject &json)
 {
     auto command = json.value("command").toString();
     trace->debug("websocket tx command {}", command.toStdString());
-
     m_webSocket->transmit(json);
 }
 

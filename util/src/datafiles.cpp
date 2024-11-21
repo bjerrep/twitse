@@ -26,7 +26,7 @@ void DataFiles::dumpVectors(QString name, int serial,
                 stream << " " << QString::number(c->at(i));
             if(d)
                 stream << " " << QString::number(d->at(i));
-            stream << endl;
+            stream << Qt::endl;
         }
     }
 }
@@ -49,7 +49,7 @@ void DataFiles::appendValues(QString name, int64_t *a, int64_t *b, int64_t *bb, 
             stream << " " << QString::number(*c);
         if(d)
             stream << " " << QString::number(*d);
-        stream << endl;
+        stream << Qt::endl;
 
     }
 }
@@ -64,7 +64,7 @@ void DataFiles::fileApp(QString name, double val, bool newline)
         QTextStream stream(&file);
         stream << QString::number(val);
         if(newline)
-            stream << endl;
+            stream << Qt::endl;
         else
             stream << " ";
     }
@@ -80,7 +80,7 @@ void DataFiles::fileApp(QString name, int64_t val, bool newline)
         QTextStream stream(&file);
         stream << QString::number(val);
         if(newline)
-            stream << endl;
+            stream << Qt::endl;
         else
             stream << " ";
     }
@@ -98,6 +98,6 @@ void DataFiles::fileApp(const std::string& name, const std::string& message)
     {
         QTextStream stream(&file);
         stream << no_ansi_colors;
-        stream << endl;
+        stream << Qt::endl;
     }
 }

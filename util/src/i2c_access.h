@@ -18,7 +18,7 @@ public:
 
     void writeVCTCXO_DAC(uint16_t dac);
 
-    bool adjustVCTCXO_DAC(int32_t relative_dac);
+    bool relativeAdjustVCTCXO_DAC(int32_t relative_lsb);
 
     uint16_t getVCTCXO_DAC();
 

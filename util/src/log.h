@@ -24,6 +24,7 @@ extern std::shared_ptr<spdlog::logger> trace;
 #define YELLOW "\033[33;1m"
 #define YELLOWONGREEN "\033[0;33m\033[42m"
 #define WHITEONGREEN "\033[0;37m\033[42m"
+#define WHITEONRED "\033[0;37m\033[41m"
 #define RESET "\033[0m"
 
 #define IMPORTANT WHITEONGREEN

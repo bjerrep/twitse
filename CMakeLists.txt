@@ -12,6 +12,8 @@ endif()
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall -std=c++11")
 # silence the Qt deprecation warnings that arrived somewhere around 5.15
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations")
+# silence spd log "template-id not allowed for constructor in C++20" on gcc 14.2-ish. Update to fix.
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-template-id-cdtor")
 
 if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
 # These C flags are intended to match a Raspberry Pi 3. For other versions they should be adjusted accordingly.

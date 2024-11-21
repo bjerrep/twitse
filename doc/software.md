@@ -107,3 +107,18 @@ There is a systemd script 'twitse_webmonitor' in ./systemd intended to be runnin
 
 
 
+## Running
+
+Both server and client running in software mode on the same x86_64. Here the criteria for success is that twitse builds in the first place and secondly doesn't hang or crash. The concept of time keeping in this scenario is pretty meaningless. But the server and client do together talk the talk and walk the walk.
+
+<p align="center"><a href="images/server_and_client_samehost_software_mode.png"><img width=600 src="images/server_and_client_samehost_software_mode.png"></a></p>
+
+
+
+Next the client is moved and is now running on a wireless raspberry, both server and client is still in software mode. Now the client time is tracking the server time and the client (rather than ntp) will now maintain the client time to match the server time as good as it can.
+
+<p align="center"><a href="images/server_and_client_raspberry_software_mode.png"><img width=600 src="images/server_and_client_raspberry_software_mode.png"></a></p>
+
+
+So next will be the real twitse operation based on raspberry computers modified with [vctcxo](doc/VCTCXO.md).
+

@@ -37,15 +37,19 @@ Make persistent as udev rule _/etc/udev/rules.d/70-wifi-powersave.rules_
 
     ACTION=="add", SUBSYSTEM=="net", KERNEL=="wlan*", RUN+="/usr/bin/iw dev %k set power_save off"
 
+The file exists in ./client_etc_udev_rulesd
+
+
+
 ## server & client
 
 Stop anything sounding like ntp or systemd-timesyncd or the like if running in software mode.
 
 ## Building - native
 
-Building natively (as opposed to crosscompile) on the Pi is super slow but a few scripts will make life much easier for build-deploy cycles when developing. As the first thing copy the development PC public keys to the server and clients (see ssh-copy-id) to avoid having to login. Then as a first manually login to the Pi's and  run cmake to setup the correct build targets and build the relevant target(s) to catch any missing dependencies. If there is no ntp (e.g. systemd-timesyncd) client running on the target then start one before building to avoid confusing make.
+Building natively (as opposed to crosscompile) on the Pi is super slow but a few scripts will make life much easier for build-deploy cycles when developing. As the first thing copy the development PC public keys to the server and clients (see ssh-copy-id) to avoid having to login. Then as a first manually login to the Pi's and  run cmake to setup the correct build targets and build the relevant target(s) to catch any missing dependencies. If there is no ntp (e.g. systemd-timesyncd) service running on the target (as there shouldn't normally be on the clients) then start one before building to avoid confusing make with wild file timestamps.
 
-Make a *remote_server_and_clients.txt* file in ./scripts with the server and/or client that should be used.
+Make a *remote_server_and_clients.txt* file in ./scripts with the server and/or client(s) that should be updated. There is a *remote_server_and_clients.txt.template* for the format.
 
 Now there is a scripts/export.sh and a scripts/build.sh that do what they say.
 
@@ -53,24 +57,39 @@ So in twitse root its now
 
 `$ scripts/export.sh && scripts/build.sh && bin/control --kill all`
 
-Things started with systemd will now restart (given that Restart=always in the systemd scripts).
-
-Otherwise processes will just exit and be ready to get restarted.
+Running twitse binaries will now exit and get restarted given that they were started by systemd in the first place and that the systemd scripts have a Restart=always. Otherwise processes will just exit and be ready to get restarted manually. 
 
 ## systemd
 
 Systemd log file maintenance seems to have a negative impact on the time measurements, especially when processes are running with a lot of debug output. If its ok to loose systemd logs at power off:
 
-    Storage=volatile in /etc/systemd/journald.conf
-    journalctl --rotate
-    journalctl --vacuum-time=1s
-    systemctl daemon-reexec
+    /etc/systemd/journald.conf
+    
+    [Journal]
+    Storage=volatile
+    RuntimeMaxUse=1M
+    
+    and then systemctl daemon-reexec
 
 Issue a journalctl --disk-usage to check that the disk logs doesn't grow anymore.
 
 
 
 # SD card backup and restore
+
+### Compressed image with dd
+
+#### Backup
+
+#dd bs=4M if=/dev/mmc... | gzip > sd_image_`date +%d%m%y`.gz
+
+#### Restore
+
+#gzip -dc sd_image.....gz | dd bs=4M of=/dev/mmc.....
+
+
+
+### Filesystem with rsync
 
 If fed up with binary copies of entire SD cards that for a start are problematic when SD cards are (never) the same size and manufacturer then just copy the files present and relevant on the SD card from the mounted /boot and / partitions.
 

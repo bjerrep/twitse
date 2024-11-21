@@ -168,28 +168,27 @@ void Server::printStatusReport()
 
     double wall_diff_sec = (s_systemTime->getRawSystemTime_ns() - SystemTime::getWallClock_ns()) / NS_IN_SEC_F;
 
+    const DeviceDeque& devices = m_deviceManager.getDevices();
+
     trace->info(CYAN "    runtime {}, cputemp {:.1f}, clients {}, wall offset {:.6f} secs" RESET,
                 dhms,
                 System::cpuTemperature(),
-                m_deviceManager.getDevices().size(),
+                devices.size(),
                 wall_diff_sec);
-    const DeviceDeque& devices = m_deviceManager.getDevices();
+
     for (Device* device : devices)
     {
         trace->info(CYAN "      {}" RESET, device->getStatusReport());
     }
 }
 
-
-/// vctcxo mode only. Continous adjustments of the realtime/vctcxo clock has the potential
-/// of really messing things up so the corrections should ideally be invisibly small.
-/// The primary job are not to get unstable and next to avoid the difference between the wall
-/// clock and the realtime clock to drift towards infinity. After these comes the wish to actually
-/// keep the offset between the clocks minimal (which it is quite poor at delivering due to the
-/// small adjustments).
-/// Note that adjustments will not be visible before ntp decides to do something which might take
-/// quite some time. Until then all clocks are equally affected when the X1 clock is adjusted.
-///
+/// Server vctcxo mode. While the clients use their vctcxo to track the server, the server uses
+/// its vctcxo to let the realtime clock track the NTP time. This is to avoid that the wall clock (NTP)
+/// and the realtime clock will be allowed to drift towards infinity which is just annoying.
+/// NTP adjusts the wallclock whenever it feels for it and twitse really should try to figure out
+/// when that is. But it currently doesn't.
+/// The server vctcxo adjustments are broadcast to the clients so that they may make the same adjustment
+/// proactively rather than see the server adjustment as drift that they will then have to correct.
 void Server::adjustRealtimeSoftPPM()
 {
     // Find the current absolute clock error
@@ -224,10 +223,17 @@ void Server::adjustRealtimeSoftPPM()
 
     if (LSB)
     {
-        bool success = I2C_Access::I2C()->adjustVCTCXO_DAC(LSB);
+        bool success = I2C_Access::I2C()->relativeAdjustVCTCXO_DAC(LSB);
         if (!success)
         {
             trace->error("vctcxo dac is saturated at {}", LSB);
+        }
+        else
+        {
+            QJsonObject json;
+            json["command"] = "server_vctcxo_adjusted";
+            json["relative_lsb"] = LSB;
+            m_deviceManager.broadcastToAllDevices(json);
         }
     }
     trace->warn("NTP '{}'. WallClockDev={:.3f} ms LSBADJ={} DAC={}",

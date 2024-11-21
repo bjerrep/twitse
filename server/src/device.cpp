@@ -15,6 +15,7 @@
 #include <QNetworkDatagram>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QThread>
 
 
 extern int g_developmentMask;
@@ -98,6 +99,11 @@ void Device::processTimeSample(int64_t remoteTime, int64_t localTime)
 }
 
 
+// A measurement series is complete, process it and ultimately send an "adjustclock" message
+// back to the client telling it how much to adjust its vctcxo oscillator.
+// Along the way this is also where the Lock object is updated and it also calls measurementFinalize()
+// which will allow a new measurement to get queued.
+//
 void Device::processMeasurement(const RxPacket& rx)
 {
     OffsetMeasurement measurement = m_measurementSeries->calculate();
@@ -173,7 +179,7 @@ void Device::processMeasurement(const RxPacket& rx)
         valid = false;
     }
 
-    if (valid and m_lock.isLock())
+    if (valid and m_lock.isLocked())
     {
         if (roundtrip_us / m_avgRoundtrip_us > 2.0)
         {
@@ -185,7 +191,7 @@ void Device::processMeasurement(const RxPacket& rx)
 
     if (!valid && (m_fixedSamplePeriod_ms < 0))
     {
-        sampleRunComplete();
+        measurementFinalize();
         m_lock.panic();
         return;
     }
@@ -218,7 +224,7 @@ void Device::processMeasurement(const RxPacket& rx)
         // experimental constants galore.
 #ifdef VCTCXO
         double magicnumber_zero = 330;
-        const double magicnumber_antislope = 9;
+        const double magicnumber_antislope = 8;
         const double magicnumber_hilock_throttle = 1.25;
         const double magicnumber_lock_throttle = 1.25;
 #else
@@ -227,6 +233,15 @@ void Device::processMeasurement(const RxPacket& rx)
         const double magicnumber_hilock_throttle = 4;
         const double magicnumber_lock_throttle = 2;
 #endif
+
+        // Calculating the ppm correction for the client consists of two factors where the first is a compensation
+        // based on the absolute offset error. This is the intuitive and straightforward part.
+        // This in itself will lead to a second order style oscillation with the quest of making it as
+        // damped as possible.
+        // To counter the oscillating behavior the second factor is a reverse direction compensation
+        // for the current apparent relative adjustment rate which will then act as an rate limiter.
+        // In the lingo of control theory then this would probably be called a "PD" control loop.
+
         bool zero_crossing = clientoffset_us * m_previousClientOffset_ns < 0.0;
         if (!zero_crossing and abs(clientoffset_us) < abs(m_previousClientOffset_ns))
         {
@@ -240,22 +255,25 @@ void Device::processMeasurement(const RxPacket& rx)
 
         double ppm = offset_ppm + levelling_ppm;
 
-        m_lock.update(clientoffset_us);
+        m_lock.updateLockState(clientoffset_us);
 
-        if (m_lock.isHiLock())
+        switch(m_lock.getLockState())
         {
+        case Lock::LockState::HILOCK:
             ppm /= magicnumber_hilock_throttle;
-        }
-        else if (m_lock.isLock())
-        {
+            break;
+        case Lock::LockState::LOCKED:
             ppm /= magicnumber_lock_throttle;
+            break;
+        case Lock::LockState::UNLOCKED:
+            break;
         }
 
-        trace->debug("{}adjusting ppm {:7.3f} (offset {:7.3f} levelling {:7.3f})",
+        trace->debug("{} adjusting ppm {:7.3f} (offset {:7.3f} levelling {:7.3f})",
                      getLogName(), ppm, offset_ppm, levelling_ppm);
 
         double ppmLimit = 0.2;
-        if (m_lock.isLock())
+        if (m_lock.isLocked())
         {
             ppmLimit = 0.1;
         }
@@ -284,15 +302,17 @@ void Device::processMeasurement(const RxPacket& rx)
     double average_offset = m_initState == InitState::RUNNING ? m_avgClientOffset_ns : 0.0;
 
     std::string message = fmt::format(
-                WHITE "{} {} runtime {:5.1f} roundtrip_us {:5.1f} "
-                      "sd_us {:5.1f} period_sec {:2} silence_sec {:2} samples {:4} avgoffs_us {:5.1f} "
+                WHITE "{} {:3} runtime {:5.1f} roundtrip_us {:5.1f} "
+                      "sd_us {:5.1f} meas_sec {:2} silence_sec {:2} samples {:4} avgoffs_us {:5.1f} "
                       "offset_us " YELLOW "{:5.1f}" RESET "{}",
                 getLogName(),
                 m_offsetMeasurementHistory->getCounter(),
                 s_systemTime->getRunningTime_secs(),
                 roundtrip_us,
                 m_offsetMeasurementHistory->getSD_us(),
-                m_lock.getMeasurementPeriod_sec(), m_lock.getInterMeasurementDelaySecs(), m_lock.getNofSamples(),
+                m_lock.getMeasurementDuration_ms() / 1000,
+                m_lock.getInterMeasurementDelaySecs(),
+                m_lock.getNofSamples(),
                 average_offset,
                 clientoffset_us,
                 extra);
@@ -359,7 +379,7 @@ void Device::processMeasurement(const RxPacket& rx)
     }
     else
     {
-        sampleRunComplete();
+        measurementFinalize();
     }
 
     if (develPeriodSweep)
@@ -405,10 +425,10 @@ void Device::timerEvent(QTimerEvent* event)
         }
         clientDisconnected();
     }
-    else if (id == m_sampleRunTimer)
+    else if (id == m_measurementSilencePeriodTimer)
     {
-        killTimer(m_sampleRunTimer);
-        m_sampleRunTimer = TIMEROFF;
+        killTimer(m_measurementSilencePeriodTimer);
+        m_measurementSilencePeriodTimer = TIMEROFF;
 
         measurementStart();
     }
@@ -428,9 +448,12 @@ void Device::tcpTx(const QJsonObject& json)
         return;
     }
 
+    trace->trace("tx '{}'", json["command"].toString().toStdString());
+
     TcpTxPacket tx(json);
 
-    // segfault seen here (during debugging). dunno how to avoid that.
+    // Segfault seen here (during debugging). dunno how to avoid that.
+    // For now added a SIGPIPE ignore handler but haven't seen that one kick in yet.
     if (!m_tcpSocket->isWritable())
     {
         trace->warn("{} tcp socket not writable?", getLogName());
@@ -491,34 +514,23 @@ void Device::slotTcpRx()
 
         QString command = rx.value("command");
 
+        if (trace->level() <= spdlog::level::level_enum::trace)
+        {
+            deserializedjson.replace('\n', QString());
+            deserializedjson.replace(' ', QString());
+            //trace->trace("-> '{}'", deserializedjson.toStdString());
+            trace->trace("rx '{}'", command.toStdString());
+        }
+
         if (command == "ready")
         {
             int delay_sec = m_lock.getInterMeasurementDelaySecs();
-
-            if (m_measurementCollisionNotice)
-            {
-                m_measurementCollisionNotice = false;
-                if (delay_sec > 10)
-                {
-                    trace->info("{} measurement collision, offsetting next measurement", getLogName());
-                }
-                delay_sec -= 2;
-            }
-
-            if (delay_sec <= 0 )
-            {
-                measurementStart();
-            }
-            else
-            {
-                timerOn(this, m_sampleRunTimer, delay_sec * 1000);
-            }
-
+            timerOn(this, m_measurementSilencePeriodTimer, delay_sec * 1000);
         }
         else if (command == "ping")
         {
         }
-        else if (command == "forwardoffset")
+        else if (command == "clientoffsetmeasurement")
         {
             std::string result = rx.value("valid").toStdString();
             bool clientValid = result == OffsetMeasurement::ResultCodeAsString(OffsetMeasurement::PASS);
@@ -526,17 +538,16 @@ void Device::slotTcpRx()
             {
                 trace->warn("{} client measurement is invalid ({}), retrying..", getLogName(), result);
                 m_lock.panic();
-                sampleRunComplete();
+                measurementFinalize();
             }
             else
             {
                 processMeasurement(rx);
             }
-
         }
         else if (command == "clockadjusted")
         {
-            sampleRunComplete();
+            measurementFinalize();
         }
         else
         {
@@ -547,7 +558,6 @@ void Device::slotTcpRx()
         {
             m_clientActive = true;
         }
-        trace->trace(deserializedjson.toStdString());
     }
 }
 
@@ -607,7 +617,7 @@ void Device::transmitLockAndQuality(bool force)
         if (message.contains("metrics"))
         {
             auto metrics = message["metrics"].toObject();
-            trace->trace("{} new {}", metrics["lockstate"].toString().toStdString());
+            trace->trace("{} new lockstate: '{}'", getLogName(), metrics["lockstate"].toString().toStdString());
         }
         emit signalWebsocketTransmit(message);
         m_lastLockAndQualityMessage = message;
@@ -623,7 +633,7 @@ void Device::slotUpdatedLockAndQuality()
 
 void Device::getClientOffset()
 {
-    tcpTx("sendforwardoffset");
+    tcpTx("clientoffsetmeasurement");
 }
 
 
@@ -636,37 +646,41 @@ std::string Device::getStatusReport()
 }
 
 
-// Called if this device started a measurement while another one was active.
-// The intention is to prevent multiple devices from consequently running with
-// interleaved measurements when all devices are running with minimum samples.
-// In all other cases it wont hurt, but it wont do any good either.
-//
-void Device::measurementCollisionNotice()
+void Device::measurementStartRequest()
 {
-    if (m_lock.getDistribution() == Lock::BURST_SILENCE)
-    {
-        m_measurementCollisionNotice = true;
-    }
+    QMutexLocker lock(&m_mutex);
+    emit signalRequestMeasurementStart(this);
 }
 
 
 void Device::measurementStart()
 {
-    int count = m_lock.getNofSamples();
+    if (m_clientConnected)
+    {
+        m_measurementStarted = true;
+        int count = m_lock.getNofSamples();
 
-    QJsonObject json;
-    json["command"] = "running";
-    json["samples"] = QString::number(count);
-    tcpTx(json);
+        QJsonObject json;
+        json["command"] = "running";
+        json["samples"] = QString::number(count);
+        tcpTx(json);
 
-    trace->debug("{} starting sample run with {} samples and period_ms {} (slept {} secs)",
-                 getLogName(), count, m_lock.getSamplePeriod_ms(), m_lock.getInterMeasurementDelaySecs());
-    emit signalRequestSamples(this, count, m_lock.getSamplePeriod_ms());
+        trace->debug("{} measurement start with {} samples and period_ms {} (slept {} secs)",
+                     getLogName(), count, m_lock.getSamplePeriod_ms(), m_lock.getInterMeasurementDelaySecs());
+        emit signalRequestSamples(this, count, m_lock.getSamplePeriod_ms());
+    }
+    else
+    {
+        emit signalMeasurementFinalized(this);
+    }
 }
 
-
-void Device::sampleRunComplete()
+void Device::measurementFinalize()
 {
+    QMutexLocker lock(&m_mutex);
+    emit signalMeasurementFinalized(this);
+    trace->debug("{} finalizing measurement", getLogName());
+
     m_measurementSeries->prepareNewDataMeasurement(m_lock.getNofSamples());
     tcpTx("sampleruncomplete");
 }
@@ -695,16 +709,16 @@ void Device::slotClientConnected()
     m_clientConnected = true;
     m_tcpSocket = m_server->nextPendingConnection();
     m_tcpSocket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
+
     m_clientAddress = QHostAddress(m_tcpSocket->peerAddress().toIPv4Address());
     m_clientTcpPort = m_tcpSocket->peerPort();
 
     trace->info(IMPORTANT "{} connected from {}:{}" RESET,
-                getLogName(), m_clientAddress.toString().toStdString(), m_clientTcpPort);
+                getLogName(),
+                m_clientAddress.toString().toStdString(),
+                (int) m_clientTcpPort);
 
     connect(m_tcpSocket, &QTcpSocket::readyRead, this, &Device::slotTcpRx);
-
-    connect(m_tcpSocket, &QAbstractSocket::disconnected,
-            m_tcpSocket, &QObject::deleteLater);
 
     transmitLockAndQuality(true);
 }
@@ -713,6 +727,12 @@ void Device::slotClientConnected()
 void Device::clientDisconnected()
 {
     m_clientConnected = false;
-    transmitLockAndQuality(true);    // fixit rename
+
+    if (m_measurementStarted)
+    {
+        m_measurementStarted = false;
+        emit signalMeasurementFinalized(this);
+    }
+    transmitLockAndQuality(true);
     emit signalConnectionLost(m_name);
 }

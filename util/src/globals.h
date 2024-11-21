@@ -19,6 +19,7 @@ const bool VCTCXO_MODE = false;
 ISUSED static const char* g_multicastIp = "224.0.0.234";
 const uint16_t g_multicastPort = 45654;
 
+// clients are both the ludit server (status forwarding to ludit clients for e.g. led control) and the web page
 const uint16_t g_websocketPort = 12343;
 
 const int g_serverPingPeriod = 5000;

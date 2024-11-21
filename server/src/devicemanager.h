@@ -2,6 +2,7 @@
 
 #include "multicast.h"
 #include "samples.h"
+#include "measurementsequenser.h"
 
 #include <QJsonObject>
 #include <deque>
@@ -10,6 +11,7 @@ class Device;
 class WebSocket;
 
 using DeviceDeque = QVector<Device*>;
+
 
 /// The DeviceManager is a utility class for the Server containing the list of all connected clients.
 /// Why it also ended up beeing the owner of the websocket instance is right now a mystery.
@@ -27,6 +29,7 @@ public:
     void process(const MulticastRxPacket& rx);
     Device* findDevice(const QString &name);
     const DeviceDeque& getDevices() const;
+    void broadcastToAllDevices(const QJsonObject& json);
     bool allDevicesInRunningState() const;
     bool idle() const;
     WebSocket* webSocket();
@@ -51,5 +54,6 @@ private:
     Samples m_samples;
     bool m_multicastTime = false;
     QVector<QString> m_activeClients;
+    MeasurementSequencer m_measurementSequencer;
     WebSocket* m_webSocket = nullptr;
 };

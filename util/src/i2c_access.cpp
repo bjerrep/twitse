@@ -16,6 +16,10 @@ I2C_Access* I2C_Access::m_self = nullptr;
 
 I2C_Access* I2C_Access::I2C()
 {
+    if (!VCTCXO_MODE)
+    {
+        trace->error("I2C access in non-vctcxo mode ?");
+    }
     if (!I2C_Access::m_self)
     {
         I2C_Access::m_self = new I2C_Access();
@@ -138,13 +142,27 @@ void I2C_Access::writeVCTCXO_DAC(uint16_t dac)
     writeLTC2606IDD1(dac);
 }
 
-bool I2C_Access::adjustVCTCXO_DAC(int32_t relative_dac)
+bool I2C_Access::relativeAdjustVCTCXO_DAC(int32_t relative_lsb)
 {
-    if (m_dac + relative_dac > 0xFF00 or m_dac + relative_dac < 0x0100)
+    // Expect the DAC/VCTCXO combo to get very unlinear or downright
+    // useless when getting to close to either rail.
+    // The correct headroom value is pending some real life measurements.
+    const uint16_t MAXDAC = 0xFF00;
+    const uint16_t MINDAC = 0x0100;
+    int32_t new_value = (int32_t) m_dac + relative_lsb;
+
+    if (new_value > MAXDAC)
     {
+        writeVCTCXO_DAC(MAXDAC);
         return false;
     }
-    writeVCTCXO_DAC(m_dac + relative_dac);
+    else if (new_value < MINDAC)
+    {
+        writeVCTCXO_DAC(MINDAC);
+        return false;
+    }
+
+    writeVCTCXO_DAC((uint16_t) new_value );
     return true;
 }
 

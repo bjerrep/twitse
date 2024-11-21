@@ -25,7 +25,7 @@ and others...
 
     <script type="text/javascript">
         var channels = {};
-        var colors = ['orange', 'yellow', 'green', 'blue', 'purple'];
+        var colors = ['orange', 'yellow', 'aquamarine', 'greenyellow', 'purple'];
         var offsets = {}
         var next_color = 0;
         var ws = null;
@@ -53,7 +53,7 @@ and others...
 
         function update_channel_list() {
             var c = document.getElementById('channel_box').getContext('2d');
-            var x1 = 30, x2 = 90, x3 = 160, x4 = 280, x5 = 350;
+            var x1 = 30, x2 = 150, x3 = 240, x4 = 340, x5 = 410;
             var y0 = 30, y = 50;
             var lineheight = 20;
             
@@ -119,9 +119,14 @@ and others...
                     ws = new WebSocket(url);
                     ws.onmessage = function (e) {
                         var obj = JSON.parse(e.data);
-                        var name = obj['name'];
-                        var command = obj['command'];
+                        var name = obj['from'];
+
+                        if (name === 'server')
+                        {
+                            return;
+                        }                        
                         
+                        var command = obj['command'];
                         var channel_info = channels[name];
                         
                         if (channel_info === undefined) {
@@ -134,16 +139,17 @@ and others...
                             channels[name] = channel_info;
                         }
                         
+                        <!-- other commands are "timesync_update" "vctcxo_dac" -->
+                        
                         if (command === "lockstateupdate") {
                             channel_info.lockstate = obj['lockstate']
                         }
                         else if (command === "connection_info") {
                             channel_info.loss = obj['loss']
                         }
-                        else {
+                        else if (command === "current_offset") {
                             var time = obj['time'];
                             var value = obj['value'];
-                            
                             var time_series = channel_info.timeseries;
                             time_series.append(parseInt(time), parseFloat(value));
                             
@@ -172,7 +178,7 @@ and others...
                 if (!ws || ws.readyState === WebSocket.CLOSED) 
                 {
                     update_channel_list();
-                    findserver(12343, "192.168.1.", 2, 255, 150, 3000, function(url)
+                    findserver(12343, "192.168.1.", 2, 255, 250, 3000, function(url)
                     {
                         if (url != null) {
                             server_info(url);
@@ -220,7 +226,7 @@ and others...
 <body>
     <h1>twitse</h1>
     <div id="info"></div>
-    <canvas id="chart" style="width:100%; height:200px"></canvas>
+    <canvas id="chart" style="width:100%; height:300px"></canvas>
     <h3>Device list:</h3>
     <canvas id="channel_box" width="500" height="150"></canvas>
     <p>

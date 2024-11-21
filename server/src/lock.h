@@ -9,18 +9,21 @@ class Lock : public QObject
 {
     Q_OBJECT
 
+    /* A quality level determines the number of samples in a measurement, and the spacing
+     * between measurements (see below)
+     */
     const static int QUALITY_LEVELS = 11;  // 0 (worst) - 10 (best)
 
+    /* The very central value of the time spacing between samples. There must be
+     * a deeper connection to e.g. the workings of the air timing in wifi but with
+     * no synchonisation in place the actuel value seems to change pretty much nothing
+     * with regard to roundtrip quality.
+     * It will however have an effect on all the hardcoded constants elsewhere in the code...
+     */
 #ifdef VCTCXO
-    const int MIN_SAMPLE_INTERVAL_ms = 10;
-    const int MIN_NOF_SAMPLES = 200;
-    const int MAX_NOF_SAMPLES = 1000;
-    const int MAX_MEAS_PERIOD_sec = 60;
+    const int BURST_SAMPLE_RATE_ms = 10;
 #else
-    const int MIN_SAMPLE_INTERVAL_ms = 10;
-    const int MIN_NOF_SAMPLES = 100;
-    const int MAX_NOF_SAMPLES = 1000;
-    const int MAX_MEAS_PERIOD_sec = 30;
+    const int BURST_SAMPLE_RATE_ms = 10;
 #endif
 
 
@@ -40,17 +43,17 @@ public:
 
     Lock(std::string clientname);
 
-    bool isHiLock() const;
-    bool isLock() const;
+    bool isLocked() const;
     LockState getLockState() const;
     int getInterMeasurementDelaySecs() const;
     int getSamplePeriod_ms() const;
-    int getMeasurementPeriod_sec() const;
+    int getMeasurementBurstSleepPeriod_sec() const;
+    int getMeasurementDuration_ms() const;
     int getNofSamples() const;
     int getQuality() const;
     int getQualityPct(int quality = -1) const;
     Distribution getDistribution() const;
-    LockState update(double offset);
+    LockState updateLockState(double offset);
     void panic();
 
     static std::string toColorString(LockState state);
@@ -67,7 +70,6 @@ private:
     std::string m_clientName;
     int m_counter = 0;
     int m_quality = 0;
-    int m_maxSamples = MAX_NOF_SAMPLES;
     Distribution m_distribution = BURST_SILENCE;
 
     // these might get set when server is starting before there is any lock objects

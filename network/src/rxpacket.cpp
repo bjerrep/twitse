@@ -39,6 +39,17 @@ QString RxPacket::toString() const
 }
 
 
+int RxPacket::valueInt(const QString &key) const
+{
+    if (!m_json)
+    {
+        return -1;
+    }
+    auto value = m_json->value(key);
+    return value.toInt();
+}
+
+
 QString RxPacket::value(const QString &key) const
 {
     if (!m_json)

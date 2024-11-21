@@ -22,12 +22,19 @@ There is a minimal audio player project made for raspberry pi's in VCTCXO mode c
 
 The VCTCXO (a.k.a TCVCXO) used can nominally be adjusted +/- 8 ppm. If the server itself is much too slow or much too fast this will effect the clients ability to get a lock. The first server tried had to be replaced since it was so far off that the clients couldn't track it at all. A VCXO might have a much larger adjustment range but that remains to checked out.
 
-## Building & Running
+## Building
 
 For building see elsewhere except when invoking cmake which is now:
 
     cmake .. -DCMAKE_BUILD_TYPE=release -DVCTCXO=on
 
-    
+## Running
 
-    
+This is twitse starting up on a wired raspberry server and a wireless raspberry client. Both raspberrys are driven by a vctcxo and are both running as root.
+
+
+
+<p align="center"><a href="images/server_and_client_vctcxo_mode.png"><img width=600 src="images/server_and_client_vctcxo_mode.png"></a></p>
+
+
+

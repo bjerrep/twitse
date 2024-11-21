@@ -38,6 +38,10 @@ Reboot all twitse computers. Allow the ludit user to reboot without a password i
 
 ludit ALL = NOPASSWD: /sbin/reboot
 
+ludit ALL = NOPASSWD: /usr/bin/systemctl
+
+
+
 
 
 ## One liner

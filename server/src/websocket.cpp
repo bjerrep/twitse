@@ -122,7 +122,9 @@ WebSocket::WebSocket(uint16_t port)
     if (success)
     {
         connect(m_webSocket, &QWebSocketServer::newConnection, this, &WebSocket::slotNewConnection);
-        trace->info("websocket server started at port {}", port);
+        // this is the twitse websocket to the ludit webpage and it is also used by ludit server to
+        // send timing status to its clients to control their leds.
+        trace->info("ludit websocket server started at port {}", port);
     }
     else
     {

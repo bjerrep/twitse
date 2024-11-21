@@ -52,23 +52,23 @@ OffsetMeasurement::ResultCode BasicMeasurementSeries::accept(
     double lost_pct = m_samples ? 100.0 - 100.0 * receivedSamples / m_samples : 0.0;
     if (lost_pct > lossFailed)
     {
-        trace->warn("{}package loss is {:.1f}%, bailing out", m_logName, lost_pct);
+        trace->warn("{} package loss is {:.1f}%, bailing out", m_logName, lost_pct);
         return OffsetMeasurement::EXCESSIVE_PACKAGELOSS;
     }
     if (lost_pct > lossWarn)
     {
-        trace->warn("{}package loss is {:.1f}%", m_logName, lost_pct);
+        trace->warn("{} package loss is {:.1f}%", m_logName, lost_pct);
     }
 
     double removed_pct = (100.0 * (receivedSamples - filteredSamples)) / receivedSamples;
     if (removed_pct > filteredFailed)
     {
-        trace->warn("{}filtered out {:.1f}% samples, bailing out", m_logName, removed_pct);
+        trace->warn("{} filtered out {:.1f}% samples, bailing out", m_logName, removed_pct);
         return OffsetMeasurement::FILTER_ERROR;
     }
     if (removed_pct > filteredWarn)
     {
-        trace->warn("{}filtered out {:.1f}% samples", m_logName, removed_pct);
+        trace->warn("{} filtered out {:.1f}% samples", m_logName, removed_pct);
     }
 
     return OffsetMeasurement::PASS;
@@ -86,7 +86,7 @@ OffsetMeasurement::ResultCode BasicMeasurementSeries::filterMeasurementsInRange(
 {
     if (time.empty())
     {
-        trace->error("{}fatal error in filterMeasurements: no data recieved", m_logName);
+        trace->error("{} fatal error in filterMeasurements: no data recieved", m_logName);
         return OffsetMeasurement::NO_DATA;
     }
 
