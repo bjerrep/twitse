@@ -120,5 +120,5 @@ Next the client is moved and is now running on a wireless raspberry, both server
 <p align="center"><a href="images/server_and_client_raspberry_software_mode.png"><img width=600 src="images/server_and_client_raspberry_software_mode.png"></a></p>
 
 
-So next will be the real twitse operation based on raspberry computers modified with [vctcxo](doc/VCTCXO.md).
+So next will be the real twitse operation based on raspberry computers modified with [vctcxo](VCTCXO.md)
 
